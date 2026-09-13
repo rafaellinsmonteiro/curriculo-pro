@@ -14,13 +14,13 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-    const resume = getResumeWithLead(id);
+    const resume = await getResumeWithLead(id);
 
     if (!resume) {
       return NextResponse.json({ error: 'Currículo não encontrado' }, { status: 404 });
     }
 
-    const versions = getVersionsByResumeId(id);
+    const versions = await getVersionsByResumeId(id);
 
     return NextResponse.json({ resume, versions });
   } catch (error) {
@@ -38,13 +38,13 @@ export async function PUT(
     const body = await request.json();
 
     if (body.title) {
-      renameResume(id, body.title);
+      await renameResume(id, body.title);
     }
     if (body.lead_id) {
-      reassignResume(id, body.lead_id);
+      await reassignResume(id, body.lead_id);
     }
 
-    const resume = getResumeWithLead(id);
+    const resume = await getResumeWithLead(id);
     return NextResponse.json(resume);
   } catch (error) {
     console.error('Error updating resume:', error);
@@ -58,7 +58,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await context.params;
-    const deleted = deleteResume(id);
+    const deleted = await deleteResume(id);
 
     if (!deleted) {
       return NextResponse.json({ error: 'Currículo não encontrado' }, { status: 404 });

@@ -19,12 +19,12 @@ export async function POST(
   try {
     const { id } = await context.params;
 
-    const resume = getResumeWithLead(id);
+    const resume = await getResumeWithLead(id);
     if (!resume) {
       return NextResponse.json({ error: 'Currículo não encontrado' }, { status: 404 });
     }
 
-    const currentVersion = getLatestVersion(id);
+    const currentVersion = await getLatestVersion(id);
     if (!currentVersion) {
       return NextResponse.json(
         { error: 'Nenhuma versão encontrada' },
@@ -52,7 +52,7 @@ export async function POST(
     const { url: pdfUrl } = await generatePDF(structured_data, uniqueFilename);
 
     // Create new version
-    createVersion({
+    await createVersion({
       resume_id: id,
       version_number: newVersionNumber,
       structured_data: JSON.stringify(structured_data),
@@ -62,11 +62,11 @@ export async function POST(
     });
 
     // Update resume
-    updateResumeVersion(id, newVersionNumber);
-    updateResumeStatus(id, 'pronto');
+    await updateResumeVersion(id, newVersionNumber);
+    await updateResumeStatus(id, 'pronto');
 
     // Log activity
-    logActivity({
+    await logActivity({
       lead_id: resume.lead_id,
       resume_id: id,
       activity_type: 'curriculo_refeito',

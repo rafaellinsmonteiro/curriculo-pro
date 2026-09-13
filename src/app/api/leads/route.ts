@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || undefined;
     const status = (searchParams.get('status') as LeadStatus) || undefined;
 
-    const leads = getLeads({ search, status });
+    const leads = await getLeads({ search, status });
     return NextResponse.json(leads);
   } catch (error) {
     console.error('Error fetching leads:', error);
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const lead = createLead({
+    const lead = await createLead({
       name: body.name.trim(),
       whatsapp: body.whatsapp.trim(),
       notes: body.notes?.trim() || undefined,

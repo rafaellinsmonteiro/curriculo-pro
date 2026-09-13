@@ -1,157 +1,151 @@
 // ==========================================
-// CurrículoPRO — Leads Service
+// CurrículoPRO — Leads Service (Supabase)
 // ==========================================
 
-import { getDb, getNextLeadCode } from '@/lib/db';
+import { getSql, getNextLeadCode } from '@/lib/db';
 import { generateId } from '@/lib/utils';
 import type { Lead, LeadWithResumeCount, LeadStatus, CreateLeadRequest, UpdateLeadRequest } from '@/lib/types';
 
-export function createLead(data: CreateLeadRequest): Lead {
-  const db = getDb();
+export async function createLead(data: CreateLeadRequest): Promise<Lead> {
+  const sql = getSql();
   const id = generateId();
-  const leadCode = getNextLeadCode();
+  const leadCode = await getNextLeadCode();
 
-  const stmt = db.prepare(`
+  const [lead] = await sql<Lead[]>`
     INSERT INTO leads (id, lead_code, name, whatsapp, status, notes, created_at, updated_at)
-    VALUES (?, ?, ?, ?, 'novo', ?, datetime('now'), datetime('now'))
-  `);
-
-  stmt.run(id, leadCode, data.name, data.whatsapp, data.notes || null);
-
-  // Log activity
-  db.prepare(`
-    INSERT INTO activities (id, lead_id, activity_type, description, created_at)
-    VALUES (?, ?, 'lead_criado', ?, datetime('now'))
-  `).run(generateId(), id, `Lead ${data.name} cadastrado`);
-
-  return getLeadById(id)!;
-}
-
-export function getLeads(params?: {
-  search?: string;
-  status?: LeadStatus;
-}): LeadWithResumeCount[] {
-  const db = getDb();
-  let query = `
-    SELECT l.*, COUNT(r.id) as resume_count
-    FROM leads l
-    LEFT JOIN resumes r ON r.lead_id = l.id
+    VALUES (${id}, ${leadCode}, ${data.name}, ${data.whatsapp}, 'novo', ${data.notes || null}, NOW(), NOW())
+    RETURNING *
   `;
 
-  const conditions: string[] = [];
-  const values: (string | number)[] = [];
+  // Log activity
+  await sql`
+    INSERT INTO activities (id, lead_id, activity_type, description, created_at)
+    VALUES (${generateId()}, ${id}, 'lead_criado', ${`Lead ${data.name} cadastrado`}, NOW())
+  `;
 
-  if (params?.search) {
-    conditions.push(`(l.name LIKE ? OR l.whatsapp LIKE ?)`);
-    values.push(`%${params.search}%`, `%${params.search}%`);
-  }
-
-  if (params?.status) {
-    conditions.push(`l.status = ?`);
-    values.push(params.status);
-  }
-
-  if (conditions.length > 0) {
-    query += ` WHERE ${conditions.join(' AND ')}`;
-  }
-
-  query += ` GROUP BY l.id ORDER BY l.created_at DESC`;
-
-  return db.prepare(query).all(...values) as LeadWithResumeCount[];
+  return lead;
 }
 
-export function getLeadById(id: string): Lead | null {
-  const db = getDb();
-  const lead = db.prepare('SELECT * FROM leads WHERE id = ?').get(id) as Lead | undefined;
+export async function getLeads(params?: {
+  search?: string;
+  status?: LeadStatus;
+}): Promise<LeadWithResumeCount[]> {
+  const sql = getSql();
+
+  let leads: LeadWithResumeCount[];
+
+  if (params?.search && params?.status) {
+    const searchPattern = `%${params.search}%`;
+    leads = await sql<LeadWithResumeCount[]>`
+      SELECT l.*, COUNT(r.id)::int as resume_count
+      FROM leads l
+      LEFT JOIN resumes r ON r.lead_id = l.id
+      WHERE (l.name ILIKE ${searchPattern} OR l.whatsapp ILIKE ${searchPattern})
+        AND l.status = ${params.status}
+      GROUP BY l.id
+      ORDER BY l.created_at DESC
+    `;
+  } else if (params?.search) {
+    const searchPattern = `%${params.search}%`;
+    leads = await sql<LeadWithResumeCount[]>`
+      SELECT l.*, COUNT(r.id)::int as resume_count
+      FROM leads l
+      LEFT JOIN resumes r ON r.lead_id = l.id
+      WHERE (l.name ILIKE ${searchPattern} OR l.whatsapp ILIKE ${searchPattern})
+      GROUP BY l.id
+      ORDER BY l.created_at DESC
+    `;
+  } else if (params?.status) {
+    leads = await sql<LeadWithResumeCount[]>`
+      SELECT l.*, COUNT(r.id)::int as resume_count
+      FROM leads l
+      LEFT JOIN resumes r ON r.lead_id = l.id
+      WHERE l.status = ${params.status}
+      GROUP BY l.id
+      ORDER BY l.created_at DESC
+    `;
+  } else {
+    leads = await sql<LeadWithResumeCount[]>`
+      SELECT l.*, COUNT(r.id)::int as resume_count
+      FROM leads l
+      LEFT JOIN resumes r ON r.lead_id = l.id
+      GROUP BY l.id
+      ORDER BY l.created_at DESC
+    `;
+  }
+
+  return leads;
+}
+
+export async function getLeadById(id: string): Promise<Lead | null> {
+  const sql = getSql();
+  const [lead] = await sql<Lead[]>`SELECT * FROM leads WHERE id = ${id}`;
   return lead || null;
 }
 
-export function getLeadByWhatsapp(whatsapp: string): Lead | null {
-  const db = getDb();
-  const lead = db.prepare('SELECT * FROM leads WHERE whatsapp = ?').get(whatsapp) as Lead | undefined;
+export async function getLeadByWhatsapp(whatsapp: string): Promise<Lead | null> {
+  const sql = getSql();
+  const [lead] = await sql<Lead[]>`SELECT * FROM leads WHERE whatsapp = ${whatsapp}`;
   return lead || null;
 }
 
-export function updateLead(id: string, data: UpdateLeadRequest): Lead | null {
-  const db = getDb();
-  const fields: string[] = [];
-  const values: (string | number)[] = [];
+export async function updateLead(id: string, data: UpdateLeadRequest): Promise<Lead | null> {
+  const sql = getSql();
 
-  if (data.name !== undefined) {
-    fields.push('name = ?');
-    values.push(data.name);
-  }
-  if (data.whatsapp !== undefined) {
-    fields.push('whatsapp = ?');
-    values.push(data.whatsapp);
-  }
-  if (data.status !== undefined) {
-    fields.push('status = ?');
-    values.push(data.status);
-  }
-  if (data.notes !== undefined) {
-    fields.push('notes = ?');
-    values.push(data.notes);
-  }
+  const current = await getLeadById(id);
+  if (!current) return null;
 
-  if (fields.length === 0) return getLeadById(id);
+  const newName = data.name !== undefined ? data.name : current.name;
+  const newWhatsapp = data.whatsapp !== undefined ? data.whatsapp : current.whatsapp;
+  const newStatus = data.status !== undefined ? data.status : current.status;
+  const newNotes = data.notes !== undefined ? data.notes : current.notes;
 
-  fields.push("updated_at = datetime('now')");
-  values.push(id);
-
-  db.prepare(`UPDATE leads SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  const [updated] = await sql<Lead[]>`
+    UPDATE leads
+    SET name = ${newName}, whatsapp = ${newWhatsapp}, status = ${newStatus}, notes = ${newNotes}, updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `;
 
   // Log activity
-  db.prepare(`
+  await sql`
     INSERT INTO activities (id, lead_id, activity_type, description, created_at)
-    VALUES (?, ?, 'lead_atualizado', 'Dados do lead atualizados', datetime('now'))
-  `).run(generateId(), id);
+    VALUES (${generateId()}, ${id}, 'lead_atualizado', 'Dados do lead atualizados', NOW())
+  `;
 
-  return getLeadById(id);
+  return updated;
 }
 
-export function deleteLead(id: string): boolean {
-  const db = getDb();
-  const result = db.prepare('DELETE FROM leads WHERE id = ?').run(id);
-  return result.changes > 0;
+export async function deleteLead(id: string): Promise<boolean> {
+  const sql = getSql();
+  const result = await sql`DELETE FROM leads WHERE id = ${id}`;
+  return result.count > 0;
 }
 
-export function getLeadStats() {
-  const db = getDb();
+export async function getLeadStats() {
+  const sql = getSql();
 
-  const totalLeads = (db.prepare('SELECT COUNT(*) as count FROM leads').get() as { count: number }).count;
-
-  const totalResumes = (db.prepare('SELECT COUNT(*) as count FROM resumes').get() as { count: number }).count;
-
-  const resumesToday = (db.prepare(
-    "SELECT COUNT(*) as count FROM resumes WHERE date(created_at) = date('now')"
-  ).get() as { count: number }).count;
-
-  const resumesEdited = (db.prepare(
-    "SELECT COUNT(*) as count FROM resumes WHERE status = 'alteracao_solicitada'"
-  ).get() as { count: number }).count;
-
-  const resumesPending = (db.prepare(
-    "SELECT COUNT(*) as count FROM resumes WHERE status = 'em_producao'"
-  ).get() as { count: number }).count;
-
-  const resumesFinished = (db.prepare(
-    "SELECT COUNT(*) as count FROM resumes WHERE status = 'finalizado'"
-  ).get() as { count: number }).count;
+  const [totalLeadsRow] = await sql`SELECT COUNT(*)::int as count FROM leads`;
+  const [totalResumesRow] = await sql`SELECT COUNT(*)::int as count FROM resumes`;
+  const [resumesTodayRow] = await sql`SELECT COUNT(*)::int as count FROM resumes WHERE DATE(created_at) = CURRENT_DATE`;
+  const [resumesEditedRow] = await sql`SELECT COUNT(*)::int as count FROM resumes WHERE status = 'alteracao_solicitada'`;
+  const [resumesPendingRow] = await sql`SELECT COUNT(*)::int as count FROM resumes WHERE status = 'em_producao'`;
+  const [resumesFinishedRow] = await sql`SELECT COUNT(*)::int as count FROM resumes WHERE status = 'finalizado'`;
 
   return {
-    total_leads: totalLeads,
-    total_resumes: totalResumes,
-    resumes_today: resumesToday,
-    resumes_edited: resumesEdited,
-    resumes_pending: resumesPending,
-    resumes_finished: resumesFinished,
+    total_leads: totalLeadsRow?.count || 0,
+    total_resumes: totalResumesRow?.count || 0,
+    resumes_today: resumesTodayRow?.count || 0,
+    resumes_edited: resumesEditedRow?.count || 0,
+    resumes_pending: resumesPendingRow?.count || 0,
+    resumes_finished: resumesFinishedRow?.count || 0,
   };
 }
 
-export function searchLeads(query: string): Lead[] {
-  const db = getDb();
-  return db.prepare(
-    `SELECT * FROM leads WHERE name LIKE ? OR whatsapp LIKE ? ORDER BY name ASC LIMIT 20`
-  ).all(`%${query}%`, `%${query}%`) as Lead[];
+export async function searchLeads(query: string): Promise<Lead[]> {
+  const sql = getSql();
+  const searchPattern = `%${query}%`;
+  return await sql<Lead[]>`
+    SELECT * FROM leads WHERE name ILIKE ${searchPattern} OR whatsapp ILIKE ${searchPattern} ORDER BY name ASC LIMIT 20
+  `;
 }

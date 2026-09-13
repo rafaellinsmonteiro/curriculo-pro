@@ -1,12 +1,12 @@
 // ==========================================
-// CurrículoPRO — Resume Versions Service
+// CurrículoPRO — Resume Versions Service (Supabase)
 // ==========================================
 
-import { getDb } from '@/lib/db';
+import { getSql } from '@/lib/db';
 import { generateId } from '@/lib/utils';
 import type { ResumeVersion } from '@/lib/types';
 
-export function createVersion(data: {
+export async function createVersion(data: {
   resume_id: string;
   version_number: number;
   structured_data: string;
@@ -14,49 +14,58 @@ export function createVersion(data: {
   edit_instruction?: string;
   pdf_url: string;
   pdf_filename: string;
-}): ResumeVersion {
-  const db = getDb();
+}): Promise<ResumeVersion> {
+  const sql = getSql();
   const id = generateId();
 
-  db.prepare(`
-    INSERT INTO resume_versions (id, resume_id, version_number, structured_data, generation_prompt, edit_instruction, pdf_url, pdf_filename, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-  `).run(
-    id,
-    data.resume_id,
-    data.version_number,
-    data.structured_data,
-    data.generation_prompt,
-    data.edit_instruction || null,
-    data.pdf_url,
-    data.pdf_filename
-  );
+  const [version] = await sql<ResumeVersion[]>`
+    INSERT INTO resume_versions (
+      id, resume_id, version_number, structured_data, generation_prompt, edit_instruction, pdf_url, pdf_filename, created_at
+    )
+    VALUES (
+      ${id},
+      ${data.resume_id},
+      ${data.version_number},
+      ${data.structured_data},
+      ${data.generation_prompt},
+      ${data.edit_instruction || null},
+      ${data.pdf_url},
+      ${data.pdf_filename},
+      NOW()
+    )
+    RETURNING *
+  `;
 
-  return getVersionById(id)!;
+  return version;
 }
 
-export function getVersionsByResumeId(resumeId: string): ResumeVersion[] {
-  const db = getDb();
-  return db.prepare(
-    'SELECT * FROM resume_versions WHERE resume_id = ? ORDER BY version_number DESC'
-  ).all(resumeId) as ResumeVersion[];
+export async function getVersionsByResumeId(resumeId: string): Promise<ResumeVersion[]> {
+  const sql = getSql();
+  return await sql<ResumeVersion[]>`
+    SELECT * FROM resume_versions WHERE resume_id = ${resumeId} ORDER BY version_number DESC
+  `;
 }
 
-export function getVersionById(id: string): ResumeVersion | null {
-  const db = getDb();
-  return (db.prepare('SELECT * FROM resume_versions WHERE id = ?').get(id) as ResumeVersion | undefined) || null;
+export async function getVersionById(id: string): Promise<ResumeVersion | null> {
+  const sql = getSql();
+  const [version] = await sql<ResumeVersion[]>`
+    SELECT * FROM resume_versions WHERE id = ${id}
+  `;
+  return version || null;
 }
 
-export function getLatestVersion(resumeId: string): ResumeVersion | null {
-  const db = getDb();
-  return (db.prepare(
-    'SELECT * FROM resume_versions WHERE resume_id = ? ORDER BY version_number DESC LIMIT 1'
-  ).get(resumeId) as ResumeVersion | undefined) || null;
+export async function getLatestVersion(resumeId: string): Promise<ResumeVersion | null> {
+  const sql = getSql();
+  const [version] = await sql<ResumeVersion[]>`
+    SELECT * FROM resume_versions WHERE resume_id = ${resumeId} ORDER BY version_number DESC LIMIT 1
+  `;
+  return version || null;
 }
 
-export function getVersionByNumber(resumeId: string, versionNumber: number): ResumeVersion | null {
-  const db = getDb();
-  return (db.prepare(
-    'SELECT * FROM resume_versions WHERE resume_id = ? AND version_number = ?'
-  ).get(resumeId, versionNumber) as ResumeVersion | undefined) || null;
+export async function getVersionByNumber(resumeId: string, versionNumber: number): Promise<ResumeVersion | null> {
+  const sql = getSql();
+  const [version] = await sql<ResumeVersion[]>`
+    SELECT * FROM resume_versions WHERE resume_id = ${resumeId} AND version_number = ${versionNumber}
+  `;
+  return version || null;
 }

@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    const leads = searchLeads(q);
+    const leads = await searchLeads(q);
     return NextResponse.json(leads);
   } catch (error) {
     console.error('Error searching leads:', error);

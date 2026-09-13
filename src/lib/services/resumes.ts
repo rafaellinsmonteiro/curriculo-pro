@@ -1,37 +1,38 @@
 // ==========================================
-// CurrículoPRO — Resumes Service
+// CurrículoPRO — Resumes Service (Supabase)
 // ==========================================
 
-import { getDb } from '@/lib/db';
+import { getSql } from '@/lib/db';
 import { generateId } from '@/lib/utils';
 import type { Resume, ResumeWithLead, ResumeStatus } from '@/lib/types';
 
-export function createResume(data: {
+export async function createResume(data: {
   lead_id: string;
   title: string;
-}): Resume {
-  const db = getDb();
+}): Promise<Resume> {
+  const sql = getSql();
   const id = generateId();
 
-  db.prepare(`
+  const [resume] = await sql<Resume[]>`
     INSERT INTO resumes (id, lead_id, title, status, current_version, created_at, updated_at)
-    VALUES (?, ?, ?, 'em_producao', 0, datetime('now'), datetime('now'))
-  `).run(id, data.lead_id, data.title);
+    VALUES (${id}, ${data.lead_id}, ${data.title}, 'em_producao', 0, NOW(), NOW())
+    RETURNING *
+  `;
 
   // Update lead status
-  db.prepare("UPDATE leads SET status = 'em_producao', updated_at = datetime('now') WHERE id = ?")
-    .run(data.lead_id);
+  await sql`UPDATE leads SET status = 'em_producao', updated_at = NOW() WHERE id = ${data.lead_id}`;
 
-  return getResumeById(id)!;
+  return resume;
 }
 
-export function getResumes(params?: {
+export async function getResumes(params?: {
   search?: string;
   status?: ResumeStatus;
   period?: 'today' | '7days' | '30days';
-}): ResumeWithLead[] {
-  const db = getDb();
-  let query = `
+}): Promise<ResumeWithLead[]> {
+  const sql = getSql();
+
+  let query = sql`
     SELECT r.*,
            l.name as lead_name,
            l.whatsapp as lead_whatsapp,
@@ -43,44 +44,77 @@ export function getResumes(params?: {
     LEFT JOIN resume_versions rv ON rv.resume_id = r.id AND rv.version_number = r.current_version
   `;
 
-  const conditions: string[] = [];
-  const values: (string | number)[] = [];
+  const searchPattern = params?.search ? `%${params.search}%` : null;
 
-  if (params?.search) {
-    conditions.push(`(l.name LIKE ? OR l.whatsapp LIKE ? OR r.title LIKE ?)`);
-    values.push(`%${params.search}%`, `%${params.search}%`, `%${params.search}%`);
-  }
-
-  if (params?.status) {
-    conditions.push(`r.status = ?`);
-    values.push(params.status);
-  }
-
-  if (params?.period === 'today') {
-    conditions.push(`date(r.created_at) = date('now')`);
+  if (params?.search && params?.status && params?.period === 'today') {
+    return await sql<ResumeWithLead[]>`
+      ${query}
+      WHERE (l.name ILIKE ${searchPattern} OR l.whatsapp ILIKE ${searchPattern} OR r.title ILIKE ${searchPattern})
+        AND r.status = ${params.status}
+        AND DATE(r.created_at) = CURRENT_DATE
+      ORDER BY r.updated_at DESC
+    `;
+  } else if (params?.search && params?.status) {
+    return await sql<ResumeWithLead[]>`
+      ${query}
+      WHERE (l.name ILIKE ${searchPattern} OR l.whatsapp ILIKE ${searchPattern} OR r.title ILIKE ${searchPattern})
+        AND r.status = ${params.status}
+      ORDER BY r.updated_at DESC
+    `;
+  } else if (params?.search) {
+    return await sql<ResumeWithLead[]>`
+      ${query}
+      WHERE (l.name ILIKE ${searchPattern} OR l.whatsapp ILIKE ${searchPattern} OR r.title ILIKE ${searchPattern})
+      ORDER BY r.updated_at DESC
+    `;
+  } else if (params?.status && params?.period === 'today') {
+    return await sql<ResumeWithLead[]>`
+      ${query}
+      WHERE r.status = ${params.status}
+        AND DATE(r.created_at) = CURRENT_DATE
+      ORDER BY r.updated_at DESC
+    `;
+  } else if (params?.status) {
+    return await sql<ResumeWithLead[]>`
+      ${query}
+      WHERE r.status = ${params.status}
+      ORDER BY r.updated_at DESC
+    `;
+  } else if (params?.period === 'today') {
+    return await sql<ResumeWithLead[]>`
+      ${query}
+      WHERE DATE(r.created_at) = CURRENT_DATE
+      ORDER BY r.updated_at DESC
+    `;
   } else if (params?.period === '7days') {
-    conditions.push(`r.created_at >= datetime('now', '-7 days')`);
+    return await sql<ResumeWithLead[]>`
+      ${query}
+      WHERE r.created_at >= NOW() - INTERVAL '7 days'
+      ORDER BY r.updated_at DESC
+    `;
   } else if (params?.period === '30days') {
-    conditions.push(`r.created_at >= datetime('now', '-30 days')`);
+    return await sql<ResumeWithLead[]>`
+      ${query}
+      WHERE r.created_at >= NOW() - INTERVAL '30 days'
+      ORDER BY r.updated_at DESC
+    `;
   }
 
-  if (conditions.length > 0) {
-    query += ` WHERE ${conditions.join(' AND ')}`;
-  }
-
-  query += ` ORDER BY r.updated_at DESC`;
-
-  return db.prepare(query).all(...values) as ResumeWithLead[];
+  return await sql<ResumeWithLead[]>`
+    ${query}
+    ORDER BY r.updated_at DESC
+  `;
 }
 
-export function getResumeById(id: string): Resume | null {
-  const db = getDb();
-  return (db.prepare('SELECT * FROM resumes WHERE id = ?').get(id) as Resume | undefined) || null;
+export async function getResumeById(id: string): Promise<Resume | null> {
+  const sql = getSql();
+  const [resume] = await sql<Resume[]>`SELECT * FROM resumes WHERE id = ${id}`;
+  return resume || null;
 }
 
-export function getResumeWithLead(id: string): ResumeWithLead | null {
-  const db = getDb();
-  return (db.prepare(`
+export async function getResumeWithLead(id: string): Promise<ResumeWithLead | null> {
+  const sql = getSql();
+  const [resume] = await sql<ResumeWithLead[]>`
     SELECT r.*,
            l.name as lead_name,
            l.whatsapp as lead_whatsapp,
@@ -90,13 +124,14 @@ export function getResumeWithLead(id: string): ResumeWithLead | null {
     FROM resumes r
     JOIN leads l ON l.id = r.lead_id
     LEFT JOIN resume_versions rv ON rv.resume_id = r.id AND rv.version_number = r.current_version
-    WHERE r.id = ?
-  `).get(id) as ResumeWithLead | undefined) || null;
+    WHERE r.id = ${id}
+  `;
+  return resume || null;
 }
 
-export function getResumesByLeadId(leadId: string): ResumeWithLead[] {
-  const db = getDb();
-  return db.prepare(`
+export async function getResumesByLeadId(leadId: string): Promise<ResumeWithLead[]> {
+  const sql = getSql();
+  return await sql<ResumeWithLead[]>`
     SELECT r.*,
            l.name as lead_name,
            l.whatsapp as lead_whatsapp,
@@ -106,37 +141,45 @@ export function getResumesByLeadId(leadId: string): ResumeWithLead[] {
     FROM resumes r
     JOIN leads l ON l.id = r.lead_id
     LEFT JOIN resume_versions rv ON rv.resume_id = r.id AND rv.version_number = r.current_version
-    WHERE r.lead_id = ?
+    WHERE r.lead_id = ${leadId}
     ORDER BY r.created_at DESC
-  `).all(leadId) as ResumeWithLead[];
+  `;
 }
 
-export function updateResumeStatus(id: string, status: ResumeStatus): void {
-  const db = getDb();
-  db.prepare("UPDATE resumes SET status = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(status, id);
+export async function updateResumeStatus(id: string, status: ResumeStatus): Promise<Resume | null> {
+  const sql = getSql();
+  const [updated] = await sql<Resume[]>`
+    UPDATE resumes SET status = ${status}, updated_at = NOW() WHERE id = ${id} RETURNING *
+  `;
+  return updated || null;
 }
 
-export function updateResumeVersion(id: string, version: number): void {
-  const db = getDb();
-  db.prepare("UPDATE resumes SET current_version = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(version, id);
+export async function updateResumeVersion(id: string, versionNumber: number): Promise<Resume | null> {
+  const sql = getSql();
+  const [updated] = await sql<Resume[]>`
+    UPDATE resumes SET current_version = ${versionNumber}, updated_at = NOW() WHERE id = ${id} RETURNING *
+  `;
+  return updated || null;
 }
 
-export function deleteResume(id: string): boolean {
-  const db = getDb();
-  const result = db.prepare('DELETE FROM resumes WHERE id = ?').run(id);
-  return result.changes > 0;
+export async function renameResume(id: string, title: string): Promise<Resume | null> {
+  const sql = getSql();
+  const [updated] = await sql<Resume[]>`
+    UPDATE resumes SET title = ${title}, updated_at = NOW() WHERE id = ${id} RETURNING *
+  `;
+  return updated || null;
 }
 
-export function renameResume(id: string, title: string): void {
-  const db = getDb();
-  db.prepare("UPDATE resumes SET title = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(title, id);
+export async function reassignResume(id: string, leadId: string): Promise<Resume | null> {
+  const sql = getSql();
+  const [updated] = await sql<Resume[]>`
+    UPDATE resumes SET lead_id = ${leadId}, updated_at = NOW() WHERE id = ${id} RETURNING *
+  `;
+  return updated || null;
 }
 
-export function reassignResume(id: string, newLeadId: string): void {
-  const db = getDb();
-  db.prepare("UPDATE resumes SET lead_id = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(newLeadId, id);
+export async function deleteResume(id: string): Promise<boolean> {
+  const sql = getSql();
+  const result = await sql`DELETE FROM resumes WHERE id = ${id}`;
+  return result.count > 0;
 }

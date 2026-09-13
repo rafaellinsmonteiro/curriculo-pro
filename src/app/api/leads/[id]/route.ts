@@ -15,14 +15,14 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-    const lead = getLeadById(id);
+    const lead = await getLeadById(id);
 
     if (!lead) {
       return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 });
     }
 
-    const resumes = getResumesByLeadId(id);
-    const activities = getActivitiesByLeadId(id);
+    const resumes = await getResumesByLeadId(id);
+    const activities = await getActivitiesByLeadId(id);
 
     return NextResponse.json({ lead, resumes, activities });
   } catch (error) {
@@ -39,7 +39,7 @@ export async function PUT(
     const { id } = await context.params;
     const body = await request.json();
 
-    const lead = updateLead(id, body);
+    const lead = await updateLead(id, body);
     if (!lead) {
       return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 });
     }
@@ -57,7 +57,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await context.params;
-    const deleted = deleteLead(id);
+    const deleted = await deleteLead(id);
 
     if (!deleted) {
       return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 });

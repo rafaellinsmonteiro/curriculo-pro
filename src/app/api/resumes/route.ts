@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const status = (searchParams.get('status') as ResumeStatus) || undefined;
     const period = (searchParams.get('period') as 'today' | '7days' | '30days') || undefined;
 
-    const resumes = getResumes({ search, status, period });
+    const resumes = await getResumes({ search, status, period });
     return NextResponse.json(resumes);
   } catch (error) {
     console.error('Error fetching resumes:', error);
@@ -160,14 +160,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Find or create lead
-    let lead = getLeadByWhatsapp(resolvedWhatsapp);
+    let lead = await getLeadByWhatsapp(resolvedWhatsapp);
     if (!lead) {
-      lead = createLead({ name: resolvedName, whatsapp: resolvedWhatsapp, notes: 'Lead criado automaticamente via novo currículo' });
+      lead = await createLead({ name: resolvedName, whatsapp: resolvedWhatsapp, notes: 'Lead criado automaticamente via novo currículo' });
     }
 
     // 6. Create resume record
     const title = formData.get('title') as string || `Currículo de ${lead.name}`;
-    const resume = createResume({ lead_id: lead.id, title });
+    const resume = await createResume({ lead_id: lead.id, title });
 
     // 7. Generate PDF
     const pdfFilename = generatePdfFilename(lead.name);
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
     const { url: pdfUrl } = await generatePDF(structured_data, uniqueFilename);
 
     // 8. Create version
-    createVersion({
+    await createVersion({
       resume_id: resume.id,
       version_number: 1,
       structured_data: JSON.stringify(structured_data),
@@ -185,11 +185,11 @@ export async function POST(request: NextRequest) {
     });
 
     // 9. Update resume version and status
-    updateResumeVersion(resume.id, 1);
-    updateResumeStatus(resume.id, 'pronto');
+    await updateResumeVersion(resume.id, 1);
+    await updateResumeStatus(resume.id, 'pronto');
 
     // 10. Log activity
-    logActivity({
+    await logActivity({
       lead_id: lead.id,
       resume_id: resume.id,
       activity_type: 'curriculo_criado',

@@ -10,8 +10,8 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const stats = getLeadStats();
-    const recentActivities = getRecentActivities(10);
+    const stats = await getLeadStats();
+    const recentActivities = await getRecentActivities(10);
 
     return NextResponse.json({
       stats,
