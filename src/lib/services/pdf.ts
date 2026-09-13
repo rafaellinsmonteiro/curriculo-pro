@@ -47,14 +47,22 @@ export async function generatePDF(
   data: StructuredResumeData,
   filename: string
 ): Promise<{ filePath: string; url: string }> {
-  const resolvedPath = path.join(process.cwd(), 'public', 'pdfs');
-
-  if (!fs.existsSync(resolvedPath)) {
-    fs.mkdirSync(resolvedPath, { recursive: true });
+  let resolvedPath = path.join(process.cwd(), 'public', 'pdfs');
+  try {
+    if (!fs.existsSync(resolvedPath)) {
+      fs.mkdirSync(resolvedPath, { recursive: true });
+    }
+    // Test write permission
+    fs.accessSync(resolvedPath, fs.constants.W_OK);
+  } catch {
+    resolvedPath = path.join('/tmp', 'pdfs');
+    if (!fs.existsSync(resolvedPath)) {
+      fs.mkdirSync(resolvedPath, { recursive: true });
+    }
   }
 
   const filePath = path.join(resolvedPath, filename);
-  const url = `/pdfs/${filename}`;
+  const url = `/api/resumes/download?filename=${encodeURIComponent(filename)}`;
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({

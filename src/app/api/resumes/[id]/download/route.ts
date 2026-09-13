@@ -35,18 +35,25 @@ export async function GET(
       return NextResponse.json({ error: 'Versão não encontrada' }, { status: 404 });
     }
 
-    const filePath = path.join(process.cwd(), 'public', 'pdfs', version.pdf_filename);
-    let fileBuffer: Buffer;
+    const publicPath = path.join(process.cwd(), 'public', 'pdfs', version.pdf_filename);
+    const tmpPath = path.join('/tmp', 'pdfs', version.pdf_filename);
+    let fileBuffer: Buffer | null = null;
 
-    if (fs.existsSync(filePath)) {
-      fileBuffer = fs.readFileSync(filePath);
+    if (fs.existsSync(publicPath)) {
+      fileBuffer = fs.readFileSync(publicPath);
+    } else if (fs.existsSync(tmpPath)) {
+      fileBuffer = fs.readFileSync(tmpPath);
     } else {
       // Serverless fallback: regenerate PDF dynamically from structured data
       const { generatePDF } = await import('@/lib/services/pdf');
       const structuredData = JSON.parse(version.structured_data);
-      await generatePDF(structuredData, version.pdf_filename);
+      const { filePath } = await generatePDF(structuredData, version.pdf_filename);
       if (fs.existsSync(filePath)) {
         fileBuffer = fs.readFileSync(filePath);
+      } else if (fs.existsSync(publicPath)) {
+        fileBuffer = fs.readFileSync(publicPath);
+      } else if (fs.existsSync(tmpPath)) {
+        fileBuffer = fs.readFileSync(tmpPath);
       } else {
         return NextResponse.json({ error: 'Erro ao gerar PDF' }, { status: 500 });
       }
