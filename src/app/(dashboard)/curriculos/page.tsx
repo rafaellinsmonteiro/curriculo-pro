@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Plus, Search, Eye, Download, Edit3, RefreshCw, MoreVertical,
-  MessageCircle, FileText, History, Trash2, Type, Link2, Paperclip, X, Camera
+  MessageCircle, FileText, History, Trash2, Type, Link2, Paperclip, X, Camera, DollarSign
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -14,7 +14,8 @@ import { ImageCropper } from '@/components/ui/ImageCropper';
 import { formatDate, formatWhatsApp, getWhatsAppLink, formatDateTime } from '@/lib/utils';
 import {
   RESUME_STATUS_LABELS, RESUME_STATUS_COLORS,
-  type ResumeWithLead, type ResumeStatus, type ResumeVersion,
+  PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS,
+  type ResumeWithLead, type ResumeStatus, type ResumeVersion, type PaymentStatus
 } from '@/lib/types';
 
 type PeriodFilter = '' | 'today' | '7days' | '30days';
@@ -45,6 +46,12 @@ export default function CurriculosPage() {
   const [deleteResumeId, setDeleteResumeId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // Payment edit
+  const [paymentResumeId, setPaymentResumeId] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pendente');
+  const [paymentPrice, setPaymentPrice] = useState<number>(10);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+
   // Version history
   const [versionResumeId, setVersionResumeId] = useState<string | null>(null);
   const [versions, setVersions] = useState<ResumeVersion[]>([]);
@@ -65,7 +72,12 @@ export default function CurriculosPage() {
 
       const res = await fetch(`/api/resumes?${params}`);
       const data = await res.json();
-      setResumes(data);
+      if (Array.isArray(data)) {
+        setResumes(data);
+      } else {
+        setResumes([]);
+        showToast(data.error || 'Erro ao carregar currículos', 'error');
+      }
     } catch (err) {
       console.error('Failed to load resumes:', err);
     } finally {
@@ -217,6 +229,32 @@ export default function CurriculosPage() {
     setEditFiles([]);
   }
 
+  function openPaymentModal(resume: ResumeWithLead) {
+    setPaymentResumeId(resume.id);
+    setPaymentStatus(resume.payment_status);
+    setPaymentPrice(resume.price || 10);
+  }
+
+  async function handlePaymentUpdate() {
+    if (!paymentResumeId) return;
+    setPaymentLoading(true);
+    try {
+      const res = await fetch(`/api/resumes/${paymentResumeId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_status: paymentStatus, price: paymentPrice }),
+      });
+      if (!res.ok) throw new Error();
+      showToast('Pagamento atualizado com sucesso', 'success');
+      setPaymentResumeId(null);
+      fetchResumes();
+    } catch {
+      showToast('Erro ao atualizar pagamento', 'error');
+    } finally {
+      setPaymentLoading(false);
+    }
+  }
+
   return (
     <>
       <div className="page-header">
@@ -273,10 +311,11 @@ export default function CurriculosPage() {
               <tr>
                 <th>Cliente</th>
                 <th>WhatsApp</th>
-                <th>Currículo</th>
                 <th>Versão</th>
-                <th>Data de Criação</th>
-                <th>Última Alteração</th>
+                <th>Valor</th>
+                <th>Pagamento</th>
+                <th>Criado em</th>
+                <th>Modificado</th>
                 <th>Status</th>
                 <th>Ações</th>
               </tr>
@@ -295,16 +334,27 @@ export default function CurriculosPage() {
                       href={getWhatsAppLink(resume.lead_whatsapp)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="whatsapp-link"
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                      className="whatsapp-link text-sm"
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
                       <MessageCircle size={14} />
                       {formatWhatsApp(resume.lead_whatsapp)}
                     </a>
                   </td>
-                  <td className="font-bold">{resume.title}</td>
                   <td>
                     <span className="badge badge-blue">V{resume.current_version}</span>
+                  </td>
+                  <td className="font-bold cursor-pointer hover:text-green-500 transition-colors" onClick={() => openPaymentModal(resume)} title="Clique para editar valor">
+                    R$ {Number(resume.price || 0).toFixed(2).replace('.', ',')}
+                  </td>
+                  <td>
+                    <span 
+                      className={`badge badge-dot cursor-pointer hover:opacity-80 transition-opacity ${PAYMENT_STATUS_COLORS[resume.payment_status]}`}
+                      onClick={() => openPaymentModal(resume)}
+                      title="Clique para editar status"
+                    >
+                      {PAYMENT_STATUS_LABELS[resume.payment_status]}
+                    </span>
                   </td>
                   <td className="text-sm text-secondary">{formatDate(resume.created_at)}</td>
                   <td className="text-sm text-secondary">{formatDate(resume.updated_at)}</td>
@@ -334,6 +384,13 @@ export default function CurriculosPage() {
                           </a>
                         </>
                       )}
+                      <button
+                        className="btn btn-ghost btn-icon btn-sm text-green-500 hover:bg-green-500/10"
+                        title="Pagamento"
+                        onClick={() => openPaymentModal(resume)}
+                      >
+                        <DollarSign size={15} />
+                      </button>
                       <button
                         className="btn btn-ghost btn-icon btn-sm"
                         title="Editar"
@@ -420,7 +477,7 @@ export default function CurriculosPage() {
         {viewResume?.pdf_url && (
           <div className="pdf-viewer-frame" style={{ height: '70vh' }}>
             <iframe
-              src={viewResume.pdf_url}
+              src={`/api/resumes/${viewResume.id}/download?inline=true`}
               title="Visualizador de PDF"
             />
           </div>
@@ -447,7 +504,7 @@ export default function CurriculosPage() {
         {editResume?.pdf_url && (
           <div style={{ marginBottom: 'var(--space-lg)' }}>
             <div className="pdf-viewer-frame" style={{ height: '40vh', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <iframe src={editResume.pdf_url} title="Currículo atual" />
+              <iframe src={`/api/resumes/${editResume.id}/download?inline=true`} title="Currículo atual" />
             </div>
           </div>
         )}
@@ -571,6 +628,47 @@ export default function CurriculosPage() {
         loading={redoLoading}
       />
 
+      {/* Payment Modal */}
+      <Modal
+        isOpen={!!paymentResumeId}
+        onClose={() => setPaymentResumeId(null)}
+        title="Editar Pagamento"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setPaymentResumeId(null)} disabled={paymentLoading}>
+              Cancelar
+            </button>
+            <button className="btn btn-primary" onClick={handlePaymentUpdate} disabled={paymentLoading}>
+              {paymentLoading ? <LoadingSpinner size={16} /> : 'Salvar Pagamento'}
+            </button>
+          </>
+        }
+      >
+        <div className="form-group">
+          <label className="form-label">Valor (R$)</label>
+          <input
+            type="number"
+            className="form-input"
+            step="0.01"
+            value={paymentPrice}
+            onChange={(e) => setPaymentPrice(parseFloat(e.target.value))}
+            disabled={paymentLoading}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Status do Pagamento</label>
+          <select
+            className="form-select"
+            value={paymentStatus}
+            onChange={(e) => setPaymentStatus(e.target.value as PaymentStatus)}
+            disabled={paymentLoading}
+          >
+            <option value="pendente">Pendente</option>
+            <option value="pago">Pago</option>
+          </select>
+        </div>
+      </Modal>
+
       {/* Delete Confirm */}
       <ConfirmDialog
         isOpen={!!deleteResumeId}
@@ -617,7 +715,7 @@ export default function CurriculosPage() {
                 <div className="version-actions">
                   {version.pdf_url && (
                     <>
-                      <a href={version.pdf_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" title="Visualizar">
+                      <a href={`/api/resumes/${versionResumeId}/download?version=${version.version_number}&inline=true`} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" title="Visualizar">
                         <Eye size={14} />
                       </a>
                       <a href={`/api/resumes/${versionResumeId}/download?version=${version.version_number}`} className="btn btn-ghost btn-sm" title="Download">

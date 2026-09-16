@@ -132,6 +132,9 @@ export async function getLeadStats() {
   const [resumesPendingRow] = await sql`SELECT COUNT(*)::int as count FROM resumes WHERE status = 'em_producao'`;
   const [resumesFinishedRow] = await sql`SELECT COUNT(*)::int as count FROM resumes WHERE status = 'finalizado'`;
 
+  const [totalRevenueRow] = await sql`SELECT SUM(price)::float as sum FROM resumes WHERE payment_status = 'pago'`;
+  const [pendingRevenueRow] = await sql`SELECT SUM(price)::float as sum FROM resumes WHERE payment_status = 'pendente'`;
+
   return {
     total_leads: totalLeadsRow?.count || 0,
     total_resumes: totalResumesRow?.count || 0,
@@ -139,6 +142,73 @@ export async function getLeadStats() {
     resumes_edited: resumesEditedRow?.count || 0,
     resumes_pending: resumesPendingRow?.count || 0,
     resumes_finished: resumesFinishedRow?.count || 0,
+    total_revenue: totalRevenueRow?.sum || 0,
+    pending_revenue: pendingRevenueRow?.sum || 0,
+  };
+}
+
+export async function getDashboardChartsData() {
+  const sql = getSql();
+  
+  const revenueData = await sql`
+    SELECT TO_CHAR(DATE(created_at), 'DD/MM') as date, SUM(price)::float as revenue
+    FROM resumes
+    WHERE payment_status = 'pago' AND created_at >= NOW() - INTERVAL '30 days'
+    GROUP BY DATE(created_at)
+    ORDER BY DATE(created_at) ASC
+  `;
+
+  const resumesData = await sql`
+    SELECT TO_CHAR(DATE(created_at), 'DD/MM') as date, COUNT(*)::int as count
+    FROM resumes
+    WHERE created_at >= NOW() - INTERVAL '30 days'
+    GROUP BY DATE(created_at)
+    ORDER BY DATE(created_at) ASC
+  `;
+
+  const statusData = await sql`
+    SELECT status, COUNT(*)::int as count
+    FROM resumes
+    GROUP BY status
+  `;
+
+  // Process data to match Recharts expectations
+  // We will generate a sequence of the last 30 days so there are no gaps in the charts
+  const last30Days = Array.from({ length: 30 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (29 - i));
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${day}/${month}`;
+  });
+
+  const revenueChart = last30Days.map(dateStr => {
+    const found = revenueData.find(row => row.date === dateStr);
+    return { date: dateStr, revenue: found ? found.revenue : 0 };
+  });
+
+  const resumesChart = last30Days.map(dateStr => {
+    const found = resumesData.find(row => row.date === dateStr);
+    return { date: dateStr, count: found ? found.count : 0 };
+  });
+
+  const statusMap: Record<string, string> = {
+    'novo': 'Novo',
+    'em_producao': 'Em Produção',
+    'aguardando_aprovacao': 'Aguardando',
+    'alteracao_solicitada': 'Alteração',
+    'finalizado': 'Finalizado'
+  };
+
+  const statusChart = statusData.map(row => ({
+    name: statusMap[row.status] || row.status,
+    value: row.count
+  }));
+
+  return {
+    revenueChart,
+    resumesChart,
+    statusChart
   };
 }
 

@@ -3,7 +3,7 @@
 // ==========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getResumeWithLead, deleteResume, renameResume, reassignResume } from '@/lib/services/resumes';
+import { getResumeWithLead, deleteResume, renameResume, reassignResume, updateResumePayment } from '@/lib/services/resumes';
 import { getVersionsByResumeId } from '@/lib/services/resume-versions';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +42,14 @@ export async function PUT(
     }
     if (body.lead_id) {
       await reassignResume(id, body.lead_id);
+    }
+    if (body.payment_status !== undefined || body.price !== undefined) {
+      const currentResume = await getResumeWithLead(id);
+      if (currentResume) {
+        const newPaymentStatus = body.payment_status !== undefined ? body.payment_status : currentResume.payment_status;
+        const newPrice = body.price !== undefined ? body.price : currentResume.price;
+        await updateResumePayment(id, newPaymentStatus, newPrice);
+      }
     }
 
     const resume = await getResumeWithLead(id);

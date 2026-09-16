@@ -4,15 +4,19 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Users, FileText, Clock, Edit3, AlertCircle, CheckCircle,
-  Plus, TrendingUp,
+  Plus, TrendingUp, DollarSign, Wallet
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { formatDateTime, getRelativeTime } from '@/lib/utils';
 import type { DashboardStats, Activity } from '@/lib/types';
+import { RevenueChart } from '@/components/dashboard/RevenueChart';
+import { ResumesChart } from '@/components/dashboard/ResumesChart';
+import { StatusChart } from '@/components/dashboard/StatusChart';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activities, setActivities] = useState<(Activity & { lead_name: string })[]>([]);
+  const [chartsData, setChartsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,6 +29,7 @@ export default function DashboardPage() {
       const data = await res.json();
       setStats(data.stats);
       setActivities(data.recentActivities || []);
+      setChartsData(data.chartsData);
     } catch (err) {
       console.error('Failed to load dashboard:', err);
     } finally {
@@ -39,10 +44,10 @@ export default function DashboardPage() {
   const statCards = [
     { label: 'Total de Leads', value: stats?.total_leads || 0, icon: Users, color: 'var(--accent-blue)', bg: 'var(--accent-blue-soft)' },
     { label: 'Currículos Criados', value: stats?.total_resumes || 0, icon: FileText, color: 'var(--accent-primary)', bg: 'var(--accent-primary-soft)' },
-    { label: 'Criados Hoje', value: stats?.resumes_today || 0, icon: TrendingUp, color: 'var(--accent-green)', bg: 'var(--accent-green-soft)' },
-    { label: 'Editados', value: stats?.resumes_edited || 0, icon: Edit3, color: 'var(--accent-orange)', bg: 'var(--accent-orange-soft)' },
-    { label: 'Pendentes', value: stats?.resumes_pending || 0, icon: AlertCircle, color: 'var(--accent-yellow)', bg: 'var(--accent-yellow-soft)' },
+    { label: 'Faturamento Total', value: `R$ ${(stats?.total_revenue || 0).toFixed(2).replace('.', ',')}`, icon: DollarSign, color: 'var(--accent-green)', bg: 'var(--accent-green-soft)' },
+    { label: 'A Receber', value: `R$ ${(stats?.pending_revenue || 0).toFixed(2).replace('.', ',')}`, icon: Wallet, color: 'var(--accent-orange)', bg: 'var(--accent-orange-soft)' },
     { label: 'Finalizados', value: stats?.resumes_finished || 0, icon: CheckCircle, color: 'var(--accent-purple)', bg: 'var(--accent-purple-soft)' },
+    { label: 'Pendentes', value: stats?.resumes_pending || 0, icon: AlertCircle, color: 'var(--accent-yellow)', bg: 'var(--accent-yellow-soft)' },
   ];
 
   const getActivityIcon = (type: string) => {
@@ -87,6 +92,15 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Charts Grid */}
+      {chartsData && (
+        <div className="dashboard-charts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+          <RevenueChart data={chartsData.revenueChart} />
+          <ResumesChart data={chartsData.resumesChart} />
+          <StatusChart data={chartsData.statusChart} />
+        </div>
+      )}
 
       {/* Recent Activity */}
       <div className="card">

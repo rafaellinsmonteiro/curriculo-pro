@@ -12,6 +12,7 @@ import { formatDate, formatDateTime, formatWhatsApp, getWhatsAppLink, getRelativ
 import {
   LEAD_STATUS_LABELS, LEAD_STATUS_COLORS,
   RESUME_STATUS_LABELS, RESUME_STATUS_COLORS,
+  PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS,
   type Lead, type ResumeWithLead, type Activity,
 } from '@/lib/types';
 
@@ -156,8 +157,10 @@ export default function LeadDetailPage(props: { params: Promise<{ id: string }> 
                 <tr>
                   <th>Currículo</th>
                   <th>Versão</th>
-                  <th>Data de Criação</th>
-                  <th>Última Alteração</th>
+                  <th>Valor</th>
+                  <th>Pagamento</th>
+                  <th>Criado em</th>
+                  <th>Modificado</th>
                   <th>Status</th>
                   <th>Ações</th>
                 </tr>
@@ -167,6 +170,12 @@ export default function LeadDetailPage(props: { params: Promise<{ id: string }> 
                   <tr key={resume.id}>
                     <td className="font-bold">{resume.title}</td>
                     <td>V{resume.current_version}</td>
+                    <td className="font-bold">R$ {Number(resume.price || 0).toFixed(2).replace('.', ',')}</td>
+                    <td>
+                      <span className={`badge badge-dot ${PAYMENT_STATUS_COLORS[resume.payment_status]}`}>
+                        {PAYMENT_STATUS_LABELS[resume.payment_status]}
+                      </span>
+                    </td>
                     <td className="text-sm text-secondary">{formatDate(resume.created_at)}</td>
                     <td className="text-sm text-secondary">{formatDate(resume.updated_at)}</td>
                     <td>
@@ -178,7 +187,7 @@ export default function LeadDetailPage(props: { params: Promise<{ id: string }> 
                       <div className="table-actions">
                         {resume.pdf_url && (
                           <>
-                            <a href={resume.pdf_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" title="Visualizar">
+                            <a href={`/api/resumes/${resume.id}/download?inline=true`} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" title="Visualizar">
                               <Eye size={15} />
                             </a>
                             <a href={`/api/resumes/${resume.id}/download`} className="btn btn-ghost btn-sm" title="Download">

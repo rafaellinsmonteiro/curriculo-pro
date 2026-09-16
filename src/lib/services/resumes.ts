@@ -4,7 +4,7 @@
 
 import { getSql } from '@/lib/db';
 import { generateId } from '@/lib/utils';
-import type { Resume, ResumeWithLead, ResumeStatus } from '@/lib/types';
+import type { Resume, ResumeWithLead, ResumeStatus, PaymentStatus } from '@/lib/types';
 
 export async function createResume(data: {
   lead_id: string;
@@ -158,6 +158,14 @@ export async function updateResumeVersion(id: string, versionNumber: number): Pr
   const sql = getSql();
   const [updated] = await sql<Resume[]>`
     UPDATE resumes SET current_version = ${versionNumber}, updated_at = NOW() WHERE id = ${id} RETURNING *
+  `;
+  return updated || null;
+}
+
+export async function updateResumePayment(id: string, paymentStatus: PaymentStatus, price: number): Promise<Resume | null> {
+  const sql = getSql();
+  const [updated] = await sql<Resume[]>`
+    UPDATE resumes SET payment_status = ${paymentStatus}, price = ${price}, updated_at = NOW() WHERE id = ${id} RETURNING *
   `;
   return updated || null;
 }

@@ -1,0 +1,57 @@
+/* Botão flutuante ou injetado no Header */
+.curriculo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: #2a7d86;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 12px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.curriculo-btn:hover {
+  background-color: #1e636b;
+  transform: translateY(-1px);
+}
+
+.curriculo-btn:active {
+  transform: translateY(0);
+}
+
+.curriculo-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+/* Spinner animado para estado de carregamento */
+@keyframes curriculo-spin {
+  to { transform: rotate(360deg); }
+}
+
+.curriculo-spinner {
+  animation: curriculo-spin 1s linear infinite;
+  display: none;
+}
+
+.curriculo-btn.loading .curriculo-spinner {
+  display: block;
+}
+
+.curriculo-btn.loading .curriculo-icon {
+  display: none;
+}
+
+.curriculo-btn.loading {
+  pointer-events: none;
+  opacity: 0.8;
+}

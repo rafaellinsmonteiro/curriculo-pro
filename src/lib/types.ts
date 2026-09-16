@@ -17,6 +17,10 @@ export type ResumeStatus =
   | 'alteracao_solicitada'
   | 'finalizado';
 
+export type PaymentStatus =
+  | 'pendente'
+  | 'pago';
+
 export type ActivityType =
   | 'lead_criado'
   | 'lead_atualizado'
@@ -45,6 +49,8 @@ export interface Resume {
   title: string;
   status: ResumeStatus;
   current_version: number;
+  payment_status: PaymentStatus;
+  price: number;
   created_at: string;
   updated_at: string;
 }
@@ -114,6 +120,8 @@ export interface DashboardStats {
   resumes_edited: number;
   resumes_pending: number;
   resumes_finished: number;
+  total_revenue: number;
+  pending_revenue: number;
 }
 
 // ---------- OpenAI Structured Resume Data ----------
@@ -188,4 +196,14 @@ export const RESUME_STATUS_COLORS: Record<ResumeStatus, string> = {
   pronto: 'badge-green',
   alteracao_solicitada: 'badge-orange',
   finalizado: 'badge-purple',
+};
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  pendente: 'Pendente',
+  pago: 'Pago',
+};
+
+export const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
+  pendente: 'badge-orange',
+  pago: 'badge-green',
 };

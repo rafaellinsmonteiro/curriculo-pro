@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CurrículoPRO</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>CurrículoPRO</h2>
+    </div>
+    
+    <div class="content">
+      <p class="desc">Acesse o WhatsApp Web para extrair conversas e gerar currículos automaticamente.</p>
+      
+      <div class="form-group">
+        <label for="apiUrl">URL da API (CurrículoPRO):</label>
+        <input type="text" id="apiUrl" placeholder="Ex: https://curriculopro-eight.vercel.app">
+      </div>
+      
+      <button id="saveBtn" class="btn">Salvar Configurações</button>
+      <span id="statusMsg" class="status-msg"></span>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

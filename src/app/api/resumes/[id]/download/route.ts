@@ -61,10 +61,13 @@ export async function GET(
 
     const sanitizedName = `Curriculo_${resume.lead_name.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}.pdf`;
 
+    const inline = searchParams.get('inline') === 'true';
+    const disposition = inline ? 'inline' : `attachment; filename="${sanitizedName}"`;
+
     return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${sanitizedName}"`,
+        'Content-Disposition': disposition,
       },
     });
   } catch (error) {

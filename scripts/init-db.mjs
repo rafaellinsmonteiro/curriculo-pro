@@ -27,6 +27,8 @@ async function init() {
         title TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'em_producao',
         current_version INT NOT NULL DEFAULT 0,
+        payment_status TEXT NOT NULL DEFAULT 'pendente',
+        price NUMERIC(10, 2) NOT NULL DEFAULT 10.00,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );

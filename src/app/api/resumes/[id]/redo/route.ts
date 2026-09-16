@@ -11,6 +11,7 @@ import { generatePDF } from '@/lib/services/pdf';
 import { generatePdfFilename } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function POST(
   _request: NextRequest,

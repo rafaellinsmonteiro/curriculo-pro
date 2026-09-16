@@ -69,6 +69,7 @@ export async function generatePDF(
       size: 'A4',
       margins: { top: PAGE_MARGIN, bottom: PAGE_MARGIN, left: PAGE_MARGIN, right: PAGE_MARGIN },
       autoFirstPage: false,
+      bufferPages: true,
       info: {
         Title: `Currículo - ${data.nome_completo}`,
         Author: 'CurrículoPRO',
@@ -88,8 +89,8 @@ export async function generatePDF(
       charsCount += (data.experiencia_profissional || []).reduce((acc, exp) => acc + (exp.descricao?.length || 0) + (exp.cargo?.length || 0) + (exp.empresa?.length || 0), 0);
       charsCount += (data.competencias || []).join('').length;
       
-      const isVeryDense = charsCount > 1400 || (data.experiencia_profissional?.length || 0) >= 4;
-      const isDense = charsCount > 900 || (data.experiencia_profissional?.length || 0) > 2;
+      const isVeryDense = charsCount > 1100 || (data.experiencia_profissional?.length || 0) >= 4;
+      const isDense = charsCount > 650 || (data.experiencia_profissional?.length || 0) >= 3;
       (doc as any).layoutMode = isVeryDense ? 'very_dense' : (isDense ? 'dense' : 'loose');
 
       let pageNumber = 0;
@@ -102,9 +103,6 @@ export async function generatePDF(
 
       // Add first page
       doc.addPage();
-
-      // Disable automatic page breaking by pushing the bottom margin off-page
-      doc.page.margins.bottom = -10000;
 
       // Draw header on the first page
       drawHeader(doc, data, HEADER_Y);
@@ -161,8 +159,12 @@ export async function generatePDF(
       // LEFT COLUMN (Sidebar)
       // ==========================================
       
-      // Save current right column Y state
-      const savedY = doc.y;
+      // We must switch to the first page to draw the left column
+      // because the right column might have automatically added pages.
+      doc.switchToPage(0);
+      
+      // Disable automatic page breaking for the sidebar so it truncates instead of spilling to page 2
+      doc.page.margins.bottom = -10000;
 
       const LEFT_LIMIT = PAGE_HEIGHT - PAGE_MARGIN - 20;
 
@@ -203,17 +205,9 @@ export async function generatePDF(
         }
       }
 
-      if (data.idiomas && data.idiomas.length > 0 && leftY < LEFT_LIMIT) {
-        leftY = drawSidebarSection(doc, 'IDIOMAS', leftY);
-        for (const idm of data.idiomas) {
-          if (leftY > LEFT_LIMIT) break;
-          const text = `${idm.idioma}${idm.nivel ? ` - ${idm.nivel}` : ''}`;
-          leftY = drawListItem(doc, text, leftY, COLORS.sidebarText, LEFT_COL_X + 10, LEFT_COL_WIDTH - 10, true);
-        }
-      }
 
-      // Restore Y if needed
-      doc.y = savedY;
+
+      doc.flushPages();
       doc.end();
 
       stream.on('finish', () => {
@@ -250,7 +244,23 @@ function drawHeader(doc: PDFKit.PDFDocument, data: StructuredResumeData, y: numb
         const imgX = PAGE_MARGIN + 12;
         const imgY = y + (HEADER_HEIGHT - imgSize) / 2;
         
-        doc.image(imageBuffer, imgX, imgY, { width: imgSize, height: imgSize });
+        // Open image to get its original dimensions
+        const img = (doc as any).openImage(imageBuffer);
+        
+        // Calculate "cover" scale (maximize scale to fill the 75x75 box)
+        const scale = Math.max(imgSize / img.width, imgSize / img.height);
+        const drawW = img.width * scale;
+        const drawH = img.height * scale;
+        
+        // Center the scaled image in the box
+        const drawX = imgX + (imgSize - drawW) / 2;
+        const drawY = imgY + (imgSize - drawH) / 2;
+
+        // Draw with clipping to avoid spilling outside the 75x75 box
+        doc.save();
+        doc.roundedRect(imgX, imgY, imgSize, imgSize, 4).clip();
+        doc.image(img, drawX, drawY, { width: drawW, height: drawH });
+        doc.restore();
 
         textStartX = imgX + imgSize + 15;
         textWidth = HEADER_WIDTH - (imgSize + 40);
@@ -323,13 +333,25 @@ function drawHeader(doc: PDFKit.PDFDocument, data: StructuredResumeData, y: numb
 // --- Main Column ---
 
 function checkPageBreak(doc: PDFKit.PDFDocument, y: number, requiredSpace: number): number {
+  const PAGE_HEIGHT = 841.89; // A4 height in pt
+  const BOTTOM_MARGIN = doc.page.margins.bottom;
+  
+  if (BOTTOM_MARGIN < 0) {
+    return y; // Sidebar disabled page breaking
+  }
+  
+  if (y + requiredSpace > PAGE_HEIGHT - BOTTOM_MARGIN) {
+    doc.addPage();
+    return doc.y; // Return the new Y position (which will be at the top margin)
+  }
+  
   return y;
 }
 
 function drawMainSection(doc: PDFKit.PDFDocument, title: string, y: number): number {
   const mode = (doc as any).layoutMode;
-  y += mode === 'very_dense' ? 6 : (mode === 'dense' ? 12 : 25); // Dynamic spacing before section
-  y = checkPageBreak(doc, y, 30);
+  y += mode === 'very_dense' ? 6 : (mode === 'dense' ? 10 : 16); // Dynamic spacing before section
+  y = checkPageBreak(doc, y, 65); // Check for title height + some text height to prevent orphan titles
   
   doc
     .font('Helvetica-Bold')
@@ -347,7 +369,7 @@ function drawMainSection(doc: PDFKit.PDFDocument, title: string, y: number): num
     .lineWidth(1)
     .stroke();
 
-  return y + 15;
+  return y + 10;
 }
 
 function drawMainText(doc: PDFKit.PDFDocument, text: string, y: number): number {
@@ -358,9 +380,9 @@ function drawMainText(doc: PDFKit.PDFDocument, text: string, y: number): number 
     .font('Helvetica')
     .fontSize(mode === 'very_dense' ? 8.5 : (mode === 'dense' ? 9 : 9.5))
     .fillColor(COLORS.mainText)
-    .text(text, RIGHT_COL_X, y, { width: RIGHT_COL_WIDTH, align: 'justify', lineGap: mode === 'very_dense' ? 2 : (mode === 'dense' ? 3 : 5) });
+    .text(text, RIGHT_COL_X, y, { width: RIGHT_COL_WIDTH, align: 'justify', lineGap: mode === 'very_dense' ? 1.5 : (mode === 'dense' ? 2 : 3) });
 
-  return doc.y + (mode === 'very_dense' ? 8 : (mode === 'dense' ? 12 : 20));
+  return doc.y + (mode === 'very_dense' ? 6 : (mode === 'dense' ? 10 : 15));
 }
 
 function drawExperience(
@@ -403,17 +425,17 @@ function drawExperience(
       .font('Helvetica')
       .fontSize(mode === 'very_dense' ? 8 : 8.5)
       .fillColor(COLORS.mainText)
-      .text(exp.descricao, RIGHT_COL_X, y, { width: RIGHT_COL_WIDTH, align: 'justify', lineGap: mode === 'very_dense' ? 1.5 : (mode === 'dense' ? 2 : 3) });
+      .text(exp.descricao, RIGHT_COL_X, y, { width: RIGHT_COL_WIDTH, align: 'justify', lineGap: mode === 'very_dense' ? 1 : (mode === 'dense' ? 1.5 : 2) });
   }
 
-  return doc.y + ((doc as any).layoutMode === 'very_dense' ? 6 : ((doc as any).layoutMode === 'dense' ? 10 : 15));
+  return doc.y + ((doc as any).layoutMode === 'very_dense' ? 5 : ((doc as any).layoutMode === 'dense' ? 8 : 12));
 }
 
 // --- Left Column ---
 
 function drawSidebarSection(doc: PDFKit.PDFDocument, title: string, y: number): number {
   const mode = (doc as any).layoutMode;
-  y += mode === 'very_dense' ? 6 : (mode === 'dense' ? 10 : 18); // Dynamic spacing before sidebar section
+  y += mode === 'very_dense' ? 6 : (mode === 'dense' ? 10 : 15); // Dynamic spacing before sidebar section
   // We assume sidebar fits on first page for simplicity, as it rarely overflows.
   doc
     .font('Helvetica-Bold')
@@ -439,9 +461,9 @@ function drawSidebarText(doc: PDFKit.PDFDocument, text: string, y: number): numb
     .font('Helvetica')
     .fontSize(mode === 'very_dense' ? 8.5 : (mode === 'dense' ? 9 : 9.5))
     .fillColor(COLORS.sidebarText)
-    .text(text, LEFT_COL_X + 10, y, { width: LEFT_COL_WIDTH - 20, align: 'left', lineGap: mode === 'very_dense' ? 2 : (mode === 'dense' ? 3 : 5) });
+    .text(text, LEFT_COL_X + 10, y, { width: LEFT_COL_WIDTH - 20, align: 'left', lineGap: mode === 'very_dense' ? 1.5 : (mode === 'dense' ? 2 : 3) });
 
-  return doc.y + (mode === 'very_dense' ? 8 : (mode === 'dense' ? 12 : 18));
+  return doc.y + (mode === 'very_dense' ? 6 : (mode === 'dense' ? 10 : 15));
 }
 
 function drawEducation(
@@ -484,7 +506,7 @@ function drawListItem(
     .font('Helvetica')
     .fontSize(mode === 'very_dense' ? 8.5 : (mode === 'dense' ? 8.5 : (isSidebar ? 9.5 : 9)))
     .fillColor(color)
-    .text(text, textX, y, { width: textWidth, lineGap: mode === 'very_dense' ? 1 : (mode === 'dense' ? 1 : 2) });
+    .text(text, textX, y, { width: textWidth, lineGap: mode === 'very_dense' ? 1 : 1.5 });
 
-  return doc.y + (mode === 'very_dense' ? 3 : (mode === 'dense' ? 5 : 10));
+  return doc.y + (mode === 'very_dense' ? 3 : (mode === 'dense' ? 4 : 6));
 }

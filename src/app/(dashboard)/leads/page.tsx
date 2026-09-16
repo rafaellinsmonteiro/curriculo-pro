@@ -51,7 +51,12 @@ function LeadsContent() {
 
       const res = await fetch(`/api/leads?${params}`);
       const data = await res.json();
-      setLeads(data);
+      if (Array.isArray(data)) {
+        setLeads(data);
+      } else {
+        setLeads([]);
+        showToast(data.error || 'Erro ao carregar leads', 'error');
+      }
     } catch (err) {
       console.error('Failed to load leads:', err);
     } finally {
@@ -150,8 +155,8 @@ function LeadsContent() {
                 <th>Cliente</th>
                 <th>WhatsApp</th>
                 <th>Currículos</th>
-                <th>Data de Cadastro</th>
-                <th>Última Atualização</th>
+                <th>Cadastrado</th>
+                <th>Atualizado</th>
                 <th>Status</th>
                 <th>Ações</th>
               </tr>
@@ -170,8 +175,8 @@ function LeadsContent() {
                       href={getWhatsAppLink(lead.whatsapp)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="whatsapp-link"
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                      className="whatsapp-link text-sm"
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
                       <MessageCircle size={14} />
                       {formatWhatsApp(lead.whatsapp)}

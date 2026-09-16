@@ -13,6 +13,7 @@ import { generatePdfFilename } from '@/lib/utils';
 import type { ResumeStatus } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Max allowed for Vercel hobby plan, prevents OpenAI timeout
 
 export async function GET(request: NextRequest) {
   try {
