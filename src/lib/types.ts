@@ -137,19 +137,19 @@ export interface StructuredResumeData {
   resumo_profissional?: string;
   objetivo_profissional?: string;
   escolaridade?: Array<{
-    instituicao: string;
-    curso: string;
+    instituicao?: string;
+    curso?: string;
     periodo?: string;
     status?: string;
   }>;
   experiencia_profissional?: Array<{
-    empresa: string;
-    cargo: string;
+    empresa?: string;
+    cargo?: string;
     periodo?: string;
     descricao?: string;
   }>;
   cursos_complementares?: Array<{
-    nome: string;
+    nome?: string;
     instituicao?: string;
     periodo?: string;
     carga_horaria?: string;
