@@ -29,8 +29,14 @@ export async function getResumes(params?: {
   search?: string;
   status?: ResumeStatus;
   period?: 'today' | '7days' | '30days';
-}): Promise<ResumeWithLead[]> {
+  page?: number;
+  limit?: number;
+}): Promise<{ data: ResumeWithLead[]; total: number }> {
   const sql = getSql();
+
+  const page = params?.page && params.page > 0 ? params.page : 1;
+  const limit = params?.limit && params.limit > 0 ? params.limit : 20;
+  const offset = (page - 1) * limit;
 
   let query = sql`
     SELECT r.*,
@@ -38,72 +44,95 @@ export async function getResumes(params?: {
            l.whatsapp as lead_whatsapp,
            l.lead_code as lead_code,
            rv.pdf_url,
-           rv.pdf_filename
+           rv.pdf_filename,
+           COUNT(*) OVER() as total_count
     FROM resumes r
     JOIN leads l ON l.id = r.lead_id
     LEFT JOIN resume_versions rv ON rv.resume_id = r.id AND rv.version_number = r.current_version
   `;
 
   const searchPattern = params?.search ? `%${params.search}%` : null;
+  type RowType = ResumeWithLead & { total_count: string };
+
+  let rows: RowType[] = [];
 
   if (params?.search && params?.status && params?.period === 'today') {
-    return await sql<ResumeWithLead[]>`
+    rows = await sql<RowType[]>`
       ${query}
       WHERE (l.name ILIKE ${searchPattern} OR l.whatsapp ILIKE ${searchPattern} OR r.title ILIKE ${searchPattern})
         AND r.status = ${params.status}
         AND DATE(r.created_at) = CURRENT_DATE
       ORDER BY r.updated_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   } else if (params?.search && params?.status) {
-    return await sql<ResumeWithLead[]>`
+    rows = await sql<RowType[]>`
       ${query}
       WHERE (l.name ILIKE ${searchPattern} OR l.whatsapp ILIKE ${searchPattern} OR r.title ILIKE ${searchPattern})
         AND r.status = ${params.status}
       ORDER BY r.updated_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   } else if (params?.search) {
-    return await sql<ResumeWithLead[]>`
+    rows = await sql<RowType[]>`
       ${query}
       WHERE (l.name ILIKE ${searchPattern} OR l.whatsapp ILIKE ${searchPattern} OR r.title ILIKE ${searchPattern})
       ORDER BY r.updated_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   } else if (params?.status && params?.period === 'today') {
-    return await sql<ResumeWithLead[]>`
+    rows = await sql<RowType[]>`
       ${query}
       WHERE r.status = ${params.status}
         AND DATE(r.created_at) = CURRENT_DATE
       ORDER BY r.updated_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   } else if (params?.status) {
-    return await sql<ResumeWithLead[]>`
+    rows = await sql<RowType[]>`
       ${query}
       WHERE r.status = ${params.status}
       ORDER BY r.updated_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   } else if (params?.period === 'today') {
-    return await sql<ResumeWithLead[]>`
+    rows = await sql<RowType[]>`
       ${query}
       WHERE DATE(r.created_at) = CURRENT_DATE
       ORDER BY r.updated_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   } else if (params?.period === '7days') {
-    return await sql<ResumeWithLead[]>`
+    rows = await sql<RowType[]>`
       ${query}
       WHERE r.created_at >= NOW() - INTERVAL '7 days'
       ORDER BY r.updated_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   } else if (params?.period === '30days') {
-    return await sql<ResumeWithLead[]>`
+    rows = await sql<RowType[]>`
       ${query}
       WHERE r.created_at >= NOW() - INTERVAL '30 days'
       ORDER BY r.updated_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  } else {
+    rows = await sql<RowType[]>`
+      ${query}
+      ORDER BY r.updated_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
   }
 
-  return await sql<ResumeWithLead[]>`
-    ${query}
-    ORDER BY r.updated_at DESC
-  `;
+  const total = rows.length > 0 ? parseInt(rows[0].total_count, 10) : 0;
+  
+  // Clean up total_count from the results before returning
+  const data = rows.map(r => {
+    const { total_count, ...rest } = r;
+    return rest as ResumeWithLead;
+  });
+
+  return { data, total };
 }
 
 export async function getResumeById(id: string): Promise<Resume | null> {

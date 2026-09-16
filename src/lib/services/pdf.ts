@@ -406,7 +406,7 @@ function drawExperience(
     .font('Helvetica-Bold')
     .fontSize(9.5)
     .fillColor(COLORS.accent)
-    .text(exp.cargo, RIGHT_COL_X, y, { width: RIGHT_COL_WIDTH });
+    .text(exp.cargo || '', RIGHT_COL_X, y, { width: RIGHT_COL_WIDTH });
   
   y = doc.y + 1;
   

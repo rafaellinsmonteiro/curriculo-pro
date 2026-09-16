@@ -28,6 +28,9 @@ export default function CurriculosPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ResumeStatus | ''>('');
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
   // Edit modal
   const [editResumeId, setEditResumeId] = useState<string | null>(null);
@@ -63,17 +66,29 @@ export default function CurriculosPage() {
   // View modal
   const [viewResume, setViewResume] = useState<ResumeWithLead | null>(null);
 
-  const fetchResumes = useCallback(async () => {
+  const fetchResumes = useCallback(async (pageToFetch = 1) => {
     try {
+      setLoading(true);
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (statusFilter) params.set('status', statusFilter);
       if (periodFilter) params.set('period', periodFilter);
+      params.set('page', pageToFetch.toString());
+      params.set('limit', '20'); // Limite padrão
 
       const res = await fetch(`/api/resumes?${params}`);
       const data = await res.json();
-      if (Array.isArray(data)) {
+      if (data && Array.isArray(data.data)) {
+        setResumes(data.data);
+        setTotalPages(data.totalPages || 1);
+        setTotalItems(data.total || 0);
+        setCurrentPage(data.page || 1);
+      } else if (Array.isArray(data)) {
+        // Fallback in case backend is not updated yet
         setResumes(data);
+        setTotalPages(1);
+        setTotalItems(data.length);
+        setCurrentPage(1);
       } else {
         setResumes([]);
         showToast(data.error || 'Erro ao carregar currículos', 'error');
@@ -83,6 +98,11 @@ export default function CurriculosPage() {
     } finally {
       setLoading(false);
     }
+  }, [search, statusFilter, periodFilter]);
+
+  // Handle filter changes (reset to page 1)
+  useEffect(() => {
+    fetchResumes(1);
   }, [search, statusFilter, periodFilter]);
 
   useEffect(() => {
@@ -310,7 +330,7 @@ export default function CurriculosPage() {
               <thead>
               <tr>
                 <th>Cliente</th>
-                <th>WhatsApp</th>
+                <th style={{ width: '150px' }}>WhatsApp</th>
                 <th>Versão</th>
                 <th>Valor</th>
                 <th>Pagamento</th>
@@ -448,6 +468,31 @@ export default function CurriculosPage() {
               ))}
               </tbody>
             </table>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-white/5 bg-white/5 mt-4 rounded-lg">
+                <div className="text-sm text-secondary">
+                  Mostrando página {currentPage} de {totalPages} ({totalItems} currículos no total)
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    disabled={currentPage === 1}
+                    onClick={() => fetchResumes(currentPage - 1)}
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => fetchResumes(currentPage + 1)}
+                  >
+                    Próxima
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

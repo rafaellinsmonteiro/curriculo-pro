@@ -21,9 +21,13 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || undefined;
     const status = (searchParams.get('status') as ResumeStatus) || undefined;
     const period = (searchParams.get('period') as 'today' | '7days' | '30days') || undefined;
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '20', 10);
 
-    const resumes = await getResumes({ search, status, period });
-    return NextResponse.json(resumes);
+    const { data, total } = await getResumes({ search, status, period, page, limit });
+    const totalPages = Math.ceil(total / limit);
+
+    return NextResponse.json({ data, total, page, totalPages });
   } catch (error) {
     console.error('Error fetching resumes:', error);
     return NextResponse.json({ error: 'Erro ao buscar currículos' }, { status: 500 });
