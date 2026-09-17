@@ -176,27 +176,27 @@ export async function getDashboardChartsData(period: 'today' | '7days' | '30days
   }
 
   const revenueData = await sql`
-    SELECT TO_CHAR(DATE(created_at), 'DD/MM') as date, SUM(price)::float as revenue
+    SELECT TO_CHAR(DATE(created_at AT TIME ZONE 'America/Sao_Paulo'), 'DD/MM') as date, SUM(price)::float as revenue
     FROM resumes
     WHERE payment_status = 'pago' ${dateFilter}
-    GROUP BY DATE(created_at)
-    ORDER BY DATE(created_at) ASC
+    GROUP BY DATE(created_at AT TIME ZONE 'America/Sao_Paulo')
+    ORDER BY DATE(created_at AT TIME ZONE 'America/Sao_Paulo') ASC
   `;
 
   const resumesData = await sql`
-    SELECT TO_CHAR(DATE(created_at), 'DD/MM') as date, COUNT(*)::int as count
+    SELECT TO_CHAR(DATE(created_at AT TIME ZONE 'America/Sao_Paulo'), 'DD/MM') as date, COUNT(*)::int as count
     FROM resumes
     WHERE 1=1 ${dateFilter}
-    GROUP BY DATE(created_at)
-    ORDER BY DATE(created_at) ASC
+    GROUP BY DATE(created_at AT TIME ZONE 'America/Sao_Paulo')
+    ORDER BY DATE(created_at AT TIME ZONE 'America/Sao_Paulo') ASC
   `;
   
   const hourlyData = await sql`
-    SELECT TO_CHAR(created_at, 'HH24:00') as hour, COUNT(*)::int as count
+    SELECT TO_CHAR(created_at AT TIME ZONE 'America/Sao_Paulo', 'HH24:00') as hour, COUNT(*)::int as count
     FROM resumes
     WHERE 1=1 ${dateFilter}
-    GROUP BY TO_CHAR(created_at, 'HH24:00')
-    ORDER BY TO_CHAR(created_at, 'HH24:00') ASC
+    GROUP BY TO_CHAR(created_at AT TIME ZONE 'America/Sao_Paulo', 'HH24:00')
+    ORDER BY TO_CHAR(created_at AT TIME ZONE 'America/Sao_Paulo', 'HH24:00') ASC
   `;
 
   const statusData = await sql`

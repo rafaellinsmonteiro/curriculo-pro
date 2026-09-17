@@ -74,7 +74,7 @@ export default function DashboardPage() {
           <select 
             value={period} 
             onChange={(e) => setPeriod(e.target.value as any)}
-            className="input"
+            className="form-select"
             style={{ minWidth: '150px' }}
           >
             <option value="today">Hoje</option>
