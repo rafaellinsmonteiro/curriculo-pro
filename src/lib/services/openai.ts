@@ -15,7 +15,7 @@ function getClient(): OpenAI {
 
 const JSON_SCHEMA = `{
   "nome_completo": "string",
-  "cargo_principal": "string",
+
   "endereco": "string (opcional)",
   "telefone": "string (opcional)",
   "email": "string (opcional)",
@@ -50,9 +50,8 @@ Seu objetivo é transformar as informações brutas (muitas vezes informais, com
 7. **Habilidades**: Gere uma lista robusta (mínimo 6, máximo 12) de competências técnicas (Hard Skills) e comportamentais (Soft Skills).
 8. **Resumo de Qualificações**: Crie no campo \`resumo_qualificacoes\` um parágrafo envolvente (3 a 4 linhas) sintetizando as qualificações gerais do candidato para ser usado no final do currículo como fechamento (Ex: "Experiência profissional diversificada em preparação de alimentos...").
 9. **Competências**: Gere uma lista (de 5 a 8 itens) no campo \`competencias\` com frases curtas baseadas nas experiências fornecidas, focando em atividades e responsabilidades chave (ex: "Operação de empilhadeira conforme qualificação", "Organização e movimentação de materiais").
-10. **Cargo Principal**: Gere no campo \`cargo_principal\` um título direto com a área (ex: "LIDERANÇA DE PRODUÇÃO | INJEÇÃO PLÁSTICA" ou o nome das profissões principais).
-11. **Limite de 1 Página (MUITO IMPORTANTE)**: O currículo final **DEVE CABER EM APENAS UMA PÁGINA**. Se o candidato tiver muitas experiências profissionais, filtre e inclua APENAS as 4 ou 5 mais recentes e relevantes. Se houver muitos cursos, limite para no máximo 5. Seja conciso e evite parágrafos longos, o design do sistema possui fontes grandes.
-12. **Compensação de Espaço para Currículos Curtos**: Se as informações fornecidas forem curtas, **COMPENSE GERANDO TEXTOS MAIS LONGOS E DETALHADOS** no Perfil Profissional, Objetivo Profissional e no Resumo de Qualificações. Você DEVE gerar essas sessões sempre, mesmo que o usuário não as tenha fornecido explicitamente. Gere também uma lista generosa de Competências (8 a 10 itens) e crie Informações Adicionais (como disponibilidade de horário, foco, etc.) para que o currículo fique robusto e preencha bem a página, evitando espaços em branco excessivos.
+10. **Limite de 1 Página (MUITO IMPORTANTE)**: O currículo final **DEVE CABER EM APENAS UMA PÁGINA**. Se o candidato tiver muitas experiências profissionais, filtre e inclua APENAS as 4 ou 5 mais recentes e relevantes. Se houver muitos cursos, limite para no máximo 5. Seja conciso e evite parágrafos longos, o design do sistema possui fontes grandes.
+11. **Compensação de Espaço para Currículos Curtos**: Se as informações fornecidas forem curtas, **COMPENSE GERANDO TEXTOS MAIS LONGOS E DETALHADOS** no Perfil Profissional, Objetivo Profissional e no Resumo de Qualificações. Você DEVE gerar essas sessões sempre, mesmo que o usuário não as tenha fornecido explicitamente. Gere também uma lista generosa de Competências (8 a 10 itens) e crie Informações Adicionais (como disponibilidade de horário, foco, etc.) para que o currículo fique robusto e preencha bem a página, evitando espaços em branco excessivos.
 
 Retorne os dados em formato JSON com a seguinte estrutura estrita:
 ${JSON_SCHEMA}

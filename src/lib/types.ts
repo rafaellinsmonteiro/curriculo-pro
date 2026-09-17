@@ -128,7 +128,6 @@ export interface DashboardStats {
 
 export interface StructuredResumeData {
   nome_completo: string;
-  cargo_principal?: string;
   foto_perfil?: string; // base64 string of the cropped profile photo
   endereco?: string;
   telefone?: string;

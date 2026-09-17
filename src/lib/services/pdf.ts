@@ -272,16 +272,11 @@ function drawHeader(doc: PDFKit.PDFDocument, data: StructuredResumeData, y: numb
     }
   }
 
-  // Left Content (Name & Role)
+  // Left Content (Name)
   const nameFontSize = hasPhoto ? 16 : 18;
-  const roleFontSize = hasPhoto ? 10 : 11;
-  const roleText = data.cargo_principal || (data.objetivo_profissional ? data.objetivo_profissional.split('.')[0].substring(0, 70) : 'PROFISSIONAL');
   
   doc.font('Helvetica-Bold').fontSize(nameFontSize);
   const nameHeight = doc.heightOfString(data.nome_completo.toUpperCase(), { width: textWidth });
-  
-  doc.font('Helvetica-Bold').fontSize(roleFontSize);
-  const roleHeight = doc.heightOfString(roleText.toUpperCase(), { width: textWidth });
   
   // Contacts
   const contactLines = [];
@@ -299,7 +294,7 @@ function drawHeader(doc: PDFKit.PDFDocument, data: StructuredResumeData, y: numb
     contactsHeight += doc.heightOfString(line, { width: textWidth });
   }
 
-  const totalHeight = nameHeight + 2 + roleHeight + 4 + contactsHeight;
+  const totalHeight = nameHeight + 4 + contactsHeight;
   let currentY = y + (HEADER_HEIGHT - totalHeight) / 2;
 
   // Draw Name
@@ -309,16 +304,7 @@ function drawHeader(doc: PDFKit.PDFDocument, data: StructuredResumeData, y: numb
     .fillColor(COLORS.mainTitle)
     .text(data.nome_completo.toUpperCase(), textStartX, currentY, { width: textWidth, align: alignText });
   
-  currentY += nameHeight + 2;
-  
-  // Draw Role
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(roleFontSize)
-    .fillColor(COLORS.accent)
-    .text(roleText.toUpperCase(), textStartX, currentY, { width: textWidth, align: alignText });
-
-  currentY += roleHeight + 4;
+  currentY += nameHeight + 4;
 
   // Draw Contacts
   doc.font('Helvetica').fontSize(9).fillColor(COLORS.mainTextLight);
