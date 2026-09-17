@@ -472,12 +472,19 @@ function drawSidebarText(doc: PDFKit.PDFDocument, text: string, y: number): numb
   return doc.y + (mode === 'very_dense' ? 6 : (mode === 'dense' ? 10 : 15));
 }
 
+const isInvalidPart = (str?: string) => {
+  if (!str) return true;
+  const lower = str.toLowerCase();
+  return lower.includes('não informad') || lower.includes('incompleto');
+};
+
 function drawEducation(
   doc: PDFKit.PDFDocument,
   edu: NonNullable<StructuredResumeData['escolaridade']>[0],
   y: number
 ): number {
-  const parts = [edu.curso, edu.instituicao, edu.periodo].filter(Boolean);
+  const parts = [edu.curso, edu.instituicao, edu.periodo].filter(p => !isInvalidPart(p));
+  if (parts.length === 0) return y;
   return drawListItem(doc, parts.join(' - '), y, COLORS.sidebarText, LEFT_COL_X + 10, LEFT_COL_WIDTH - 20, true);
 }
 
@@ -486,7 +493,8 @@ function drawCourse(
   curso: NonNullable<StructuredResumeData['cursos_complementares']>[0],
   y: number
 ): number {
-  const parts = [curso.nome, curso.instituicao, curso.periodo].filter(Boolean);
+  const parts = [curso.nome, curso.instituicao, curso.periodo].filter(p => !isInvalidPart(p));
+  if (parts.length === 0) return y;
   return drawListItem(doc, parts.join(' - '), y, COLORS.sidebarText, LEFT_COL_X + 10, LEFT_COL_WIDTH - 20, true);
 }
 

@@ -46,7 +46,7 @@ Seu objetivo é transformar as informações brutas (muitas vezes informais, com
    - **CASO B (Apenas lista de profissões)**: Se o usuário jogar apenas uma lista solta de profissões (ex: "armador, pintor, pedreiro") sem empresas ou datas, separe CADA profissão em um item diferente. **NÃO INVENTE nomes de empresas nem períodos** (simplesmente OMITA as chaves \`empresa\` e \`periodo\` no JSON). Apenas neste caso, GERE uma descrição (2-3 linhas) das atividades daquele cargo para o currículo não ficar vazio.
 4. **Verbos de Ação**: Inicie descrições de atividades com verbos de ação fortes (ex: Gerenciou, Executou, Atuou, Responsável por).
 5. **Dados Pessoais**: Agrupe informações como data de nascimento, naturalidade, estado civil e CNH em um array curto de strings no campo \`dados_pessoais\` (ex: ["Nascimento: 26/10/1985", "Estado civil: Solteira"]). SE UMA INFORMAÇÃO NÃO FOI FORNECIDA, SIMPLESMENTE OMita O ITEM INTEIRO DA LISTA.
-6. **Omissão Inteligente (NÃO USE "Não Informado")**: NUNCA, SOB HIPÓTESE ALGUMA, escreva "Não Informado", "Não Informada" ou similares. Se uma informação não existir (como estado civil, data de nascimento, CNH, período, escola), simplesmente NÃO a inclua na lista ou no JSON. Oculte a informação completamente.
+6. **Omissão Inteligente (NÃO USE "Não Informado" ou "Incompleto")**: NUNCA, SOB HIPÓTESE ALGUMA, preencha dados com textos como "Não Informado", "Não Informada", "Incompleto", "Não Concluído" ou similares (especialmente em 'escolaridade' e 'experiencia_profissional'). Se uma informação não existir (como nome da escola, curso, período), simplesmente OMita a chave correspondente no objeto JSON. Oculte a informação completamente em vez de inventar preenchimentos nulos.
 7. **Habilidades**: Gere uma lista robusta (mínimo 6, máximo 12) de competências técnicas (Hard Skills) e comportamentais (Soft Skills).
 8. **Resumo de Qualificações**: Crie no campo \`resumo_qualificacoes\` um parágrafo envolvente (3 a 4 linhas) sintetizando as qualificações gerais do candidato para ser usado no final do currículo como fechamento (Ex: "Experiência profissional diversificada em preparação de alimentos...").
 9. **Competências**: Gere uma lista (de 5 a 8 itens) no campo \`competencias\` com frases curtas baseadas nas experiências fornecidas, focando em atividades e responsabilidades chave (ex: "Operação de empilhadeira conforme qualificação", "Organização e movimentação de materiais").
@@ -67,7 +67,7 @@ Mantenha sempre a REGRA CRÍTICA DE 1 PÁGINA: O currículo não pode ser muito 
 
 Preserve a estrutura e as demais informações do currículo. Não remova informações a menos que solicitado. Se a solicitação pedir para adicionar ou inventar novas seções (como objetivo profissional ou informações adicionais para preencher espaço), VOCÊ DEVE OBEDECER E CRIÁ-LAS.
 
-Regra de Omissão Inteligente: Se houver algum campo no JSON atual com o valor "Não informado" (ou similar) ou em listas como \`dados_pessoais\`, REMOVA ESSE DADO COMPLETAMENTE ao gerar o JSON de saída. NUNCA coloque "Não informado".
+Regra de Omissão Inteligente: Se houver algum campo no JSON atual com o valor "Não informado", "Incompleto", "Não Concluído" (ou similar) ou em listas como \`dados_pessoais\`, REMOVA ESSE DADO COMPLETAMENTE ao gerar o JSON de saída. NUNCA coloque "Não informado" ou "Incompleto".
 
 Retorne os dados completos do currículo já atualizados no seguinte formato JSON estrito:
 ${JSON_SCHEMA}
