@@ -1,56 +1,83 @@
 'use client';
 
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+import dynamic from 'next/dynamic';
+import { useMemo } from 'react';
+import { TrendingUp } from 'lucide-react';
+
+const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 interface RevenueChartProps {
   data: { date: string; revenue: number }[];
 }
 
 export function RevenueChart({ data }: RevenueChartProps) {
+  const options = useMemo<any>(() => ({
+    chart: {
+      type: 'area',
+      toolbar: { show: false },
+      background: 'transparent',
+      animations: {
+        enabled: true,
+        easing: 'easeinout',
+        speed: 800,
+      },
+    },
+    theme: {
+      mode: 'dark',
+    },
+    colors: ['#00d68f'],
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.4,
+        opacityTo: 0.05,
+        stops: [0, 90, 100]
+      }
+    },
+    dataLabels: {
+      enabled: false
+    },
+    stroke: {
+      curve: 'smooth',
+      width: 3
+    },
+    xaxis: {
+      categories: data.map(d => d.date),
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+      labels: {
+        style: { colors: '#9090b0', fontSize: '12px' }
+      }
+    },
+    yaxis: {
+      labels: {
+        formatter: (val: number) => `R$ ${val}`,
+        style: { colors: '#9090b0', fontSize: '12px' }
+      }
+    },
+    grid: {
+      borderColor: 'rgba(255, 255, 255, 0.05)',
+      strokeDashArray: 4,
+    },
+    tooltip: {
+      theme: 'dark',
+      y: {
+        formatter: (val: number) => `R$ ${val.toFixed(2).replace('.', ',')}`
+      }
+    }
+  }), [data]);
+
+  const series = [{
+    name: 'Faturamento',
+    data: data.map(d => d.revenue)
+  }];
+
   return (
-    <div className="chart-container">
-      <h3 className="chart-title">Faturamento (30 dias)</h3>
+    <div className="glass-card" style={{ '--stat-color': 'var(--accent-green)' } as any}>
+      <h3 className="chart-title"><TrendingUp size={20} color="var(--accent-green)" /> Faturamento</h3>
       <div style={{ width: '100%', height: 300 }}>
-        <ResponsiveContainer>
-          <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-            <XAxis 
-              dataKey="date" 
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'var(--text-secondary)', fontSize: 12 }}
-              dy={10}
-            />
-            <YAxis 
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'var(--text-secondary)', fontSize: 12 }}
-              tickFormatter={(value) => `R$${value}`}
-            />
-            <Tooltip 
-              contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
-              itemStyle={{ color: 'var(--accent-green)' }}
-              formatter={(value: any) => [`R$ ${Number(value).toFixed(2).replace('.', ',')}`, 'Faturamento']}
-              labelStyle={{ color: 'var(--text-primary)', fontWeight: 'bold', marginBottom: '4px' }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="revenue" 
-              stroke="var(--accent-green)" 
-              strokeWidth={3}
-              dot={{ r: 4, fill: 'var(--accent-green)', strokeWidth: 0 }}
-              activeDot={{ r: 6, fill: 'var(--accent-green)', stroke: 'var(--bg-primary)', strokeWidth: 2 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <Chart options={options} series={series} type="area" height="100%" />
       </div>
     </div>
   );

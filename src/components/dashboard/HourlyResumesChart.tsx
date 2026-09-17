@@ -1,57 +1,82 @@
 'use client';
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell
-} from 'recharts';
+import dynamic from 'next/dynamic';
+import { useMemo } from 'react';
+import { Clock } from 'lucide-react';
+
+const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 interface HourlyResumesChartProps {
   data: { hour: string; count: number }[];
 }
 
 export function HourlyResumesChart({ data }: HourlyResumesChartProps) {
+  const options = useMemo<any>(() => ({
+    chart: {
+      type: 'area',
+      toolbar: { show: false },
+      background: 'transparent',
+      animations: {
+        enabled: true,
+        easing: 'easeinout',
+        speed: 800,
+      },
+    },
+    theme: {
+      mode: 'dark',
+    },
+    colors: ['#a855f7'],
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.5,
+        opacityTo: 0.05,
+        stops: [0, 90, 100]
+      }
+    },
+    dataLabels: {
+      enabled: false
+    },
+    stroke: {
+      curve: 'smooth',
+      width: 2
+    },
+    xaxis: {
+      categories: data.map(d => d.hour),
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+      labels: {
+        style: { colors: '#9090b0', fontSize: '11px' }
+      }
+    },
+    yaxis: {
+      labels: {
+        style: { colors: '#9090b0', fontSize: '12px' }
+      }
+    },
+    grid: {
+      borderColor: 'rgba(255, 255, 255, 0.05)',
+      strokeDashArray: 4,
+    },
+    tooltip: {
+      theme: 'dark',
+      y: {
+        formatter: (val: number) => `${val} Currículos`
+      }
+    }
+  }), [data]);
+
+  const series = [{
+    name: 'Gerados',
+    data: data.map(d => d.count)
+  }];
+
   return (
-    <div className="chart-container">
-      <h3 className="chart-title">Currículos Gerados por Hora</h3>
+    <div className="glass-card" style={{ '--stat-color': 'var(--accent-purple)' } as any}>
+      <h3 className="chart-title"><Clock size={20} color="var(--accent-purple)" /> Currículos por Hora</h3>
       <div style={{ width: '100%', height: 300 }}>
-        <ResponsiveContainer>
-          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-            <XAxis 
-              dataKey="hour" 
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
-              dy={10}
-              interval={1}
-            />
-            <YAxis 
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'var(--text-secondary)', fontSize: 12 }}
-              allowDecimals={false}
-            />
-            <Tooltip 
-              cursor={{ fill: 'var(--border-color)' }}
-              contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
-              itemStyle={{ color: 'var(--accent-purple)' }}
-              formatter={(value: any) => [value, 'Currículos']}
-              labelStyle={{ color: 'var(--text-primary)', fontWeight: 'bold', marginBottom: '4px' }}
-              labelFormatter={(label) => `Hora: ${label}`}
-            />
-            <Bar dataKey="count" fill="var(--accent-purple)" radius={[4, 4, 0, 0]}>
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.count > 0 ? 'var(--accent-purple)' : 'var(--border-color)'} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        <Chart options={options} series={series} type="area" height="100%" />
       </div>
     </div>
   );

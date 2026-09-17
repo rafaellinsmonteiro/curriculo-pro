@@ -100,9 +100,9 @@ export default function DashboardPage() {
       {/* Stats Grid */}
       <div className="stats-grid">
         {statCards.map((card) => (
-          <div key={card.label} className="stat-card" style={{ '--stat-color': card.color } as React.CSSProperties}>
+          <div key={card.label} className="stat-card glass-card" style={{ '--stat-color': card.color } as React.CSSProperties}>
             <div className="stat-card-icon" style={{ background: card.bg, color: card.color }}>
-              <card.icon size={22} />
+              <card.icon size={26} />
             </div>
             <div className="stat-card-value">{card.value}</div>
             <div className="stat-card-label">{card.label}</div>
@@ -113,11 +113,11 @@ export default function DashboardPage() {
       {/* Charts Grid */}
       {chartsData && (
         <>
-          <div className="dashboard-charts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '24px' }}>
+          <div className="dashboard-charts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '32px', marginBottom: '32px' }}>
             <RevenueChart data={chartsData.revenueChart} />
             <ResumesChart data={chartsData.resumesChart} />
           </div>
-          <div className="dashboard-charts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+          <div className="dashboard-charts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '32px', marginBottom: '40px' }}>
             <HourlyResumesChart data={chartsData.hourlyChart} />
             <StatusChart data={chartsData.statusChart} />
           </div>
@@ -125,7 +125,7 @@ export default function DashboardPage() {
       )}
 
       {/* Recent Activity */}
-      <div className="card">
+      <div className="card glass-card">
         <div className="card-header">
           <h3 className="card-title">Atividade Recente</h3>
         </div>
