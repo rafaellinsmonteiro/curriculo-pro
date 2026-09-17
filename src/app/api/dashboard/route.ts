@@ -8,11 +8,14 @@ import { getRecentActivities } from '@/lib/services/activities';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const stats = await getLeadStats();
+    const { searchParams } = new URL(request.url);
+    const period = (searchParams.get('period') as 'today' | '7days' | '30days' | 'all') || '30days';
+
+    const stats = await getLeadStats(period);
     const recentActivities = await getRecentActivities(10);
-    const chartsData = await getDashboardChartsData();
+    const chartsData = await getDashboardChartsData(period);
 
     return NextResponse.json({
       stats,

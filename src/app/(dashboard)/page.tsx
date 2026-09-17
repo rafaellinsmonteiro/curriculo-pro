@@ -13,7 +13,10 @@ import { RevenueChart } from '@/components/dashboard/RevenueChart';
 import { ResumesChart } from '@/components/dashboard/ResumesChart';
 import { StatusChart } from '@/components/dashboard/StatusChart';
 
+import { HourlyResumesChart } from '@/components/dashboard/HourlyResumesChart';
+
 export default function DashboardPage() {
+  const [period, setPeriod] = useState<'today' | '7days' | '30days' | 'all'>('30days');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activities, setActivities] = useState<(Activity & { lead_name: string })[]>([]);
   const [chartsData, setChartsData] = useState<any>(null);
@@ -21,11 +24,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboard();
-  }, []);
+  }, [period]);
 
   async function fetchDashboard() {
+    setLoading(true);
     try {
-      const res = await fetch('/api/dashboard');
+      const res = await fetch(`/api/dashboard?period=${period}`);
       const data = await res.json();
       setStats(data.stats);
       setActivities(data.recentActivities || []);
@@ -37,7 +41,7 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) {
+  if (loading && !stats) {
     return <LoadingSpinner fullPage message="Carregando dashboard..." />;
   }
 
@@ -61,10 +65,23 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="page-header">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1>Dashboard</h1>
           <p className="page-header-subtitle">Visão geral do CurrículoPRO</p>
+        </div>
+        <div>
+          <select 
+            value={period} 
+            onChange={(e) => setPeriod(e.target.value as any)}
+            className="input"
+            style={{ minWidth: '150px' }}
+          >
+            <option value="today">Hoje</option>
+            <option value="7days">Últimos 7 dias</option>
+            <option value="30days">Últimos 30 dias</option>
+            <option value="all">Todo o período</option>
+          </select>
         </div>
       </div>
 
@@ -95,11 +112,16 @@ export default function DashboardPage() {
 
       {/* Charts Grid */}
       {chartsData && (
-        <div className="dashboard-charts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-          <RevenueChart data={chartsData.revenueChart} />
-          <ResumesChart data={chartsData.resumesChart} />
-          <StatusChart data={chartsData.statusChart} />
-        </div>
+        <>
+          <div className="dashboard-charts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '24px' }}>
+            <RevenueChart data={chartsData.revenueChart} />
+            <ResumesChart data={chartsData.resumesChart} />
+          </div>
+          <div className="dashboard-charts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+            <HourlyResumesChart data={chartsData.hourlyChart} />
+            <StatusChart data={chartsData.statusChart} />
+          </div>
+        </>
       )}
 
       {/* Recent Activity */}

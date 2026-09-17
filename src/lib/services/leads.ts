@@ -122,18 +122,34 @@ export async function deleteLead(id: string): Promise<boolean> {
   return result.count > 0;
 }
 
-export async function getLeadStats() {
+export async function getLeadStats(period: 'today' | '7days' | '30days' | 'all' = '30days') {
   const sql = getSql();
 
-  const [totalLeadsRow] = await sql`SELECT COUNT(*)::int as count FROM leads`;
-  const [totalResumesRow] = await sql`SELECT COUNT(*)::int as count FROM resumes`;
-  const [resumesTodayRow] = await sql`SELECT COUNT(*)::int as count FROM resumes WHERE DATE(created_at) = CURRENT_DATE`;
-  const [resumesEditedRow] = await sql`SELECT COUNT(*)::int as count FROM resumes WHERE status = 'alteracao_solicitada'`;
-  const [resumesPendingRow] = await sql`SELECT COUNT(*)::int as count FROM resumes WHERE status = 'em_producao'`;
-  const [resumesFinishedRow] = await sql`SELECT COUNT(*)::int as count FROM resumes WHERE status = 'finalizado'`;
+  let dateFilter = sql``;
+  if (period === 'today') {
+    dateFilter = sql`WHERE DATE(created_at) = CURRENT_DATE`;
+  } else if (period === '7days') {
+    dateFilter = sql`WHERE created_at >= NOW() - INTERVAL '7 days'`;
+  } else if (period === '30days') {
+    dateFilter = sql`WHERE created_at >= NOW() - INTERVAL '30 days'`;
+  }
 
-  const [totalRevenueRow] = await sql`SELECT SUM(price)::float as sum FROM resumes WHERE payment_status = 'pago'`;
-  const [pendingRevenueRow] = await sql`SELECT SUM(price)::float as sum FROM resumes WHERE payment_status = 'pendente'`;
+  // Note: we can't use dynamic WHERE in multiple independent queries easily without repeating,
+  // so we'll build them individually or conditionally
+  const [totalLeadsRow] = await sql`SELECT COUNT(*)::int as count FROM leads ${period === 'all' ? sql`` : dateFilter}`;
+  const [totalResumesRow] = await sql`SELECT COUNT(*)::int as count FROM resumes ${period === 'all' ? sql`` : dateFilter}`;
+  const [resumesTodayRow] = await sql`SELECT COUNT(*)::int as count FROM resumes WHERE DATE(created_at) = CURRENT_DATE`;
+  
+  // Statuses
+  let statusWhere = period === 'all' ? sql`WHERE status =` : sql`${dateFilter} AND status =`;
+  const [resumesEditedRow] = await sql`SELECT COUNT(*)::int as count FROM resumes ${statusWhere} 'alteracao_solicitada'`;
+  const [resumesPendingRow] = await sql`SELECT COUNT(*)::int as count FROM resumes ${statusWhere} 'em_producao'`;
+  const [resumesFinishedRow] = await sql`SELECT COUNT(*)::int as count FROM resumes ${statusWhere} 'finalizado'`;
+
+  // Revenue
+  let revenueWhere = period === 'all' ? sql`WHERE payment_status =` : sql`${dateFilter} AND payment_status =`;
+  const [totalRevenueRow] = await sql`SELECT SUM(price)::float as sum FROM resumes ${revenueWhere} 'pago'`;
+  const [pendingRevenueRow] = await sql`SELECT SUM(price)::float as sum FROM resumes ${revenueWhere} 'pendente'`;
 
   return {
     total_leads: totalLeadsRow?.count || 0,
@@ -147,13 +163,22 @@ export async function getLeadStats() {
   };
 }
 
-export async function getDashboardChartsData() {
+export async function getDashboardChartsData(period: 'today' | '7days' | '30days' | 'all' = '30days') {
   const sql = getSql();
   
+  let dateFilter = sql``;
+  if (period === 'today') {
+    dateFilter = sql`AND created_at >= CURRENT_DATE`;
+  } else if (period === '7days') {
+    dateFilter = sql`AND created_at >= NOW() - INTERVAL '7 days'`;
+  } else if (period === '30days') {
+    dateFilter = sql`AND created_at >= NOW() - INTERVAL '30 days'`;
+  }
+
   const revenueData = await sql`
     SELECT TO_CHAR(DATE(created_at), 'DD/MM') as date, SUM(price)::float as revenue
     FROM resumes
-    WHERE payment_status = 'pago' AND created_at >= NOW() - INTERVAL '30 days'
+    WHERE payment_status = 'pago' ${dateFilter}
     GROUP BY DATE(created_at)
     ORDER BY DATE(created_at) ASC
   `;
@@ -161,35 +186,67 @@ export async function getDashboardChartsData() {
   const resumesData = await sql`
     SELECT TO_CHAR(DATE(created_at), 'DD/MM') as date, COUNT(*)::int as count
     FROM resumes
-    WHERE created_at >= NOW() - INTERVAL '30 days'
+    WHERE 1=1 ${dateFilter}
     GROUP BY DATE(created_at)
     ORDER BY DATE(created_at) ASC
+  `;
+  
+  const hourlyData = await sql`
+    SELECT TO_CHAR(created_at, 'HH24:00') as hour, COUNT(*)::int as count
+    FROM resumes
+    WHERE 1=1 ${dateFilter}
+    GROUP BY TO_CHAR(created_at, 'HH24:00')
+    ORDER BY TO_CHAR(created_at, 'HH24:00') ASC
   `;
 
   const statusData = await sql`
     SELECT status, COUNT(*)::int as count
     FROM resumes
+    WHERE 1=1 ${dateFilter}
     GROUP BY status
   `;
 
-  // Process data to match Recharts expectations
-  // We will generate a sequence of the last 30 days so there are no gaps in the charts
-  const last30Days = Array.from({ length: 30 }).map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (29 - i));
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    return `${day}/${month}`;
-  });
+  // Determine chart length
+  let chartLength = 30;
+  if (period === 'today') chartLength = 1;
+  else if (period === '7days') chartLength = 7;
+  else if (period === '30days') chartLength = 30;
 
-  const revenueChart = last30Days.map(dateStr => {
-    const found = revenueData.find(row => row.date === dateStr);
-    return { date: dateStr, revenue: found ? found.revenue : 0 };
-  });
+  let revenueChart = [];
+  let resumesChart = [];
 
-  const resumesChart = last30Days.map(dateStr => {
-    const found = resumesData.find(row => row.date === dateStr);
-    return { date: dateStr, count: found ? found.count : 0 };
+  if (period !== 'all') {
+    const daysArray = Array.from({ length: chartLength }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - ((chartLength - 1) - i));
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      return `${day}/${month}`;
+    });
+
+    revenueChart = daysArray.map(dateStr => {
+      const found = revenueData.find(row => row.date === dateStr);
+      return { date: dateStr, revenue: found ? found.revenue : 0 };
+    });
+
+    resumesChart = daysArray.map(dateStr => {
+      const found = resumesData.find(row => row.date === dateStr);
+      return { date: dateStr, count: found ? found.count : 0 };
+    });
+  } else {
+    // For 'all', just use the data as-is without filling gaps
+    revenueChart = revenueData;
+    resumesChart = resumesData;
+  }
+  
+  // Fill gaps for 24 hours
+  const hoursArray = Array.from({ length: 24 }).map((_, i) => {
+    return `${String(i).padStart(2, '0')}:00`;
+  });
+  
+  const hourlyChart = hoursArray.map(hourStr => {
+    const found = hourlyData.find(row => row.hour === hourStr);
+    return { hour: hourStr, count: found ? found.count : 0 };
   });
 
   const statusMap: Record<string, string> = {
@@ -208,6 +265,7 @@ export async function getDashboardChartsData() {
   return {
     revenueChart,
     resumesChart,
+    hourlyChart,
     statusChart
   };
 }
