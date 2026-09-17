@@ -35,15 +35,21 @@ export async function POST(
 
     // Re-generate using the same prompt, or fallback to an edit if the original prompt was empty (e.g. from an image)
     let structured_data;
+    const currentData = JSON.parse(currentVersion.structured_data);
+
     if (currentVersion.generation_prompt && currentVersion.generation_prompt.trim().length > 0) {
       const result = await generateResume(currentVersion.generation_prompt);
       structured_data = result.structured_data;
     } else {
       const { editResume } = require('@/lib/services/openai');
-      const currentData = JSON.parse(currentVersion.structured_data);
       const instruction = "Revise e melhore a escrita deste currículo. IMPORTANTE: Se o currículo for curto (com poucas informações), INVENTE e preencha as sessões 'objetivo_profissional' e 'informacoes_adicionais' com informações profissionais genéricas da área (ex: disponibilidade, comprometimento), e estique os textos de resumo e perfil para deixá-lo longo e robusto.";
       const result = await editResume(currentData, instruction);
       structured_data = result.structured_data;
+    }
+
+    // Preserve profile photo from the previous version
+    if (currentData.foto_perfil) {
+      structured_data.foto_perfil = currentData.foto_perfil;
     }
 
     // Generate new PDF
