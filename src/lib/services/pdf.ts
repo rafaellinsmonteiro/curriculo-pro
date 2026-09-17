@@ -174,10 +174,13 @@ export async function generatePDF(
       }
 
       if (data.dados_pessoais && data.dados_pessoais.length > 0 && leftY < LEFT_LIMIT) {
-        leftY = drawSidebarSection(doc, 'DADOS PESSOAIS', leftY);
-        for (const dado of data.dados_pessoais) {
-          if (leftY > LEFT_LIMIT) break;
-          leftY = drawListItem(doc, dado, leftY, COLORS.sidebarText, LEFT_COL_X + 10, LEFT_COL_WIDTH - 10, true);
+        const validDadosPessoais = data.dados_pessoais.filter(dado => !isInvalidPart(dado));
+        if (validDadosPessoais.length > 0) {
+          leftY = drawSidebarSection(doc, 'DADOS PESSOAIS', leftY);
+          for (const dado of validDadosPessoais) {
+            if (leftY > LEFT_LIMIT) break;
+            leftY = drawListItem(doc, dado, leftY, COLORS.sidebarText, LEFT_COL_X + 10, LEFT_COL_WIDTH - 10, true);
+          }
         }
       }
 
@@ -472,11 +475,11 @@ function drawSidebarText(doc: PDFKit.PDFDocument, text: string, y: number): numb
   return doc.y + (mode === 'very_dense' ? 6 : (mode === 'dense' ? 10 : 15));
 }
 
-const isInvalidPart = (str?: string) => {
+function isInvalidPart(str?: string) {
   if (!str) return true;
   const lower = str.toLowerCase();
   return lower.includes('não informad') || lower.includes('incompleto');
-};
+}
 
 function drawEducation(
   doc: PDFKit.PDFDocument,
