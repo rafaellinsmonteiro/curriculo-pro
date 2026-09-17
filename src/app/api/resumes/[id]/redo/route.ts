@@ -58,12 +58,15 @@ export async function POST(
     const uniqueFilename = `${id}_v${newVersionNumber}_${pdfFilename}`;
     const { url: pdfUrl } = await generatePDF(structured_data, uniqueFilename);
 
-    // Create new version
+    // Create new version (sanitize strings to prevent PostgreSQL null byte error)
+    const sanitizedPrompt = currentVersion.generation_prompt ? currentVersion.generation_prompt.replace(/\0/g, '') : null;
+    const sanitizedStructuredData = JSON.stringify(structured_data).replace(/\0/g, '');
+
     await createVersion({
       resume_id: id,
       version_number: newVersionNumber,
-      structured_data: JSON.stringify(structured_data),
-      generation_prompt: currentVersion.generation_prompt,
+      structured_data: sanitizedStructuredData,
+      generation_prompt: sanitizedPrompt,
       pdf_url: pdfUrl,
       pdf_filename: uniqueFilename,
     });
