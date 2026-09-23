@@ -20,6 +20,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Server-to-server access (e.g. PriveAgent) to the resumes API via a shared
+  // API key, bypassing the browser session cookie requirement.
+  const apiKey = process.env.PRIVEAGENT_API_KEY;
+  if (pathname.startsWith('/api/resumes') && apiKey && request.headers.get('x-api-key') === apiKey) {
+    return NextResponse.next();
+  }
+
   const token = request.cookies.get(COOKIE_NAME)?.value;
 
   if (!token) {
