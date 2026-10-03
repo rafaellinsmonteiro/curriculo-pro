@@ -475,10 +475,14 @@ function drawSidebarText(doc: PDFKit.PDFDocument, text: string, y: number): numb
   return doc.y + (mode === 'very_dense' ? 6 : (mode === 'dense' ? 10 : 15));
 }
 
+// Placeholders the model used to fill missing fields. "Incompleto" only as the
+// whole value ("Incompleto", "Escolaridade: Incompleto"): a course like
+// "Ensino Médio Incompleto (cursado até o 1º ano)" is the client's real data,
+// and matching it anywhere hid that education item from the PDF.
 function isInvalidPart(str?: string) {
   if (!str) return true;
-  const lower = str.toLowerCase();
-  return lower.includes('não informad') || lower.includes('incompleto');
+  const lower = str.toLowerCase().trim();
+  return lower.includes('não informad') || /^([^:]*:\s*)?(incompleto|incompleta|n[aã]o conclu[ií]d[oa])\.?$/.test(lower);
 }
 
 function drawEducation(
