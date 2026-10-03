@@ -167,48 +167,8 @@ export async function generatePDF(
       doc.page.margins.bottom = -10000;
 
       const LEFT_LIMIT = PAGE_HEIGHT - PAGE_MARGIN - 20;
-
-      if (data.resumo_profissional && leftY < LEFT_LIMIT) {
-        leftY = drawSidebarSection(doc, 'PERFIL PROFISSIONAL', leftY);
-        leftY = drawSidebarText(doc, data.resumo_profissional, leftY);
-      }
-
-      if (data.dados_pessoais && data.dados_pessoais.length > 0 && leftY < LEFT_LIMIT) {
-        const validDadosPessoais = data.dados_pessoais.filter(dado => !isInvalidPart(dado));
-        if (validDadosPessoais.length > 0) {
-          leftY = drawSidebarSection(doc, 'DADOS PESSOAIS', leftY);
-          for (const dado of validDadosPessoais) {
-            if (leftY > LEFT_LIMIT) break;
-            leftY = drawListItem(doc, dado, leftY, COLORS.sidebarText, LEFT_COL_X + 10, LEFT_COL_WIDTH - 10, true);
-          }
-        }
-      }
-
-      if (data.escolaridade && data.escolaridade.length > 0 && leftY < LEFT_LIMIT) {
-        leftY = drawSidebarSection(doc, 'FORMAÇÃO', leftY);
-        for (const edu of data.escolaridade) {
-          if (leftY > LEFT_LIMIT) break;
-          leftY = drawEducation(doc, edu, leftY);
-        }
-      }
-
-      if (data.cursos_complementares && data.cursos_complementares.length > 0 && leftY < LEFT_LIMIT) {
-        leftY = drawSidebarSection(doc, 'CURSOS', leftY);
-        for (const curso of data.cursos_complementares) {
-          if (leftY > LEFT_LIMIT) break;
-          leftY = drawCourse(doc, curso, leftY);
-        }
-      }
-
-      if (data.habilidades && data.habilidades.length > 0 && leftY < LEFT_LIMIT) {
-        leftY = drawSidebarSection(doc, 'HABILIDADES', leftY);
-        for (const hab of data.habilidades) {
-          if (leftY > LEFT_LIMIT) break;
-          leftY = drawListItem(doc, hab, leftY, COLORS.sidebarText, LEFT_COL_X + 10, LEFT_COL_WIDTH - 10, true);
-        }
-      }
-
-
+      (doc as any).sidebarFontDelta = fittingSidebarFontDelta(data, leftY, LEFT_LIMIT, (doc as any).layoutMode);
+      drawSidebarColumn(doc, data, leftY, LEFT_LIMIT);
 
       doc.flushPages();
       doc.end();
@@ -442,6 +402,75 @@ function drawExperience(
 
 // --- Left Column ---
 
+/**
+ * Draws the sidebar (profile, personal data, education, courses, skills) from
+ * y down to limit; whatever doesn't fit is left out.
+ */
+function drawSidebarColumn(doc: PDFKit.PDFDocument, data: StructuredResumeData, y: number, limit: number): number {
+  let leftY = y;
+  if (data.resumo_profissional && leftY < limit) {
+    leftY = drawSidebarSection(doc, 'PERFIL PROFISSIONAL', leftY);
+    leftY = drawSidebarText(doc, data.resumo_profissional, leftY);
+  }
+
+  if (data.dados_pessoais && data.dados_pessoais.length > 0 && leftY < limit) {
+    const validDadosPessoais = data.dados_pessoais.filter(dado => !isInvalidPart(dado));
+    if (validDadosPessoais.length > 0) {
+      leftY = drawSidebarSection(doc, 'DADOS PESSOAIS', leftY);
+      for (const dado of validDadosPessoais) {
+        if (leftY > limit) break;
+        leftY = drawListItem(doc, dado, leftY, COLORS.sidebarText, LEFT_COL_X + 10, LEFT_COL_WIDTH - 10, true);
+      }
+    }
+  }
+
+  if (data.escolaridade && data.escolaridade.length > 0 && leftY < limit) {
+    leftY = drawSidebarSection(doc, 'FORMAÇÃO', leftY);
+    for (const edu of data.escolaridade) {
+      if (leftY > limit) break;
+      leftY = drawEducation(doc, edu, leftY);
+    }
+  }
+
+  if (data.cursos_complementares && data.cursos_complementares.length > 0 && leftY < limit) {
+    leftY = drawSidebarSection(doc, 'CURSOS', leftY);
+    for (const curso of data.cursos_complementares) {
+      if (leftY > limit) break;
+      leftY = drawCourse(doc, curso, leftY);
+    }
+  }
+
+  if (data.habilidades && data.habilidades.length > 0 && leftY < limit) {
+    leftY = drawSidebarSection(doc, 'HABILIDADES', leftY);
+    for (const hab of data.habilidades) {
+      if (leftY > limit) break;
+      leftY = drawListItem(doc, hab, leftY, COLORS.sidebarText, LEFT_COL_X + 10, LEFT_COL_WIDTH - 10, true);
+    }
+  }
+  return leftY;
+}
+
+/**
+ * The layout mode is chosen from the right column only, so a long sidebar
+ * was cut at the page end without notice (found in production: a longer
+ * education line pushed the last two skills off the page). The sidebar is
+ * measured on a scratch document with the same drawing code, and its text
+ * shrinks in 0.5pt steps (down to 1.5pt) until it fits.
+ */
+function fittingSidebarFontDelta(data: StructuredResumeData, y: number, limit: number, layoutMode: string): number {
+  for (const delta of [0, -0.5, -1, -1.5]) {
+    const scratch = new PDFDocument({ size: 'A4', margins: { top: PAGE_MARGIN, bottom: PAGE_MARGIN, left: PAGE_MARGIN, right: PAGE_MARGIN }, autoFirstPage: false });
+    scratch.addPage();
+    scratch.page.margins.bottom = -10000;
+    (scratch as any).layoutMode = layoutMode;
+    (scratch as any).sidebarFontDelta = delta;
+    const end = drawSidebarColumn(scratch, data, y, Infinity);
+    scratch.end();
+    if (end <= limit) return delta;
+  }
+  return -1.5;
+}
+
 function drawSidebarSection(doc: PDFKit.PDFDocument, title: string, y: number): number {
   const mode = (doc as any).layoutMode;
   y += mode === 'very_dense' ? 6 : (mode === 'dense' ? 10 : 15); // Dynamic spacing before sidebar section
@@ -468,7 +497,7 @@ function drawSidebarText(doc: PDFKit.PDFDocument, text: string, y: number): numb
   const mode = (doc as any).layoutMode;
   doc
     .font('Helvetica')
-    .fontSize(mode === 'very_dense' ? 8.5 : (mode === 'dense' ? 9 : 9.5))
+    .fontSize((mode === 'very_dense' ? 8.5 : (mode === 'dense' ? 9 : 9.5)) + ((doc as any).sidebarFontDelta || 0))
     .fillColor(COLORS.sidebarText)
     .text(text, LEFT_COL_X + 10, y, { width: LEFT_COL_WIDTH - 20, align: 'left', lineGap: mode === 'very_dense' ? 1.5 : (mode === 'dense' ? 2 : 3) });
 
@@ -525,7 +554,7 @@ function drawListItem(
   const textWidth = width - 12;
   doc
     .font('Helvetica')
-    .fontSize(mode === 'very_dense' ? 8.5 : (mode === 'dense' ? 8.5 : (isSidebar ? 9.5 : 9)))
+    .fontSize((mode === 'very_dense' ? 8.5 : (mode === 'dense' ? 8.5 : (isSidebar ? 9.5 : 9))) + (isSidebar ? ((doc as any).sidebarFontDelta || 0) : 0))
     .fillColor(color)
     .text(text, textX, y, { width: textWidth, lineGap: mode === 'very_dense' ? 1 : 1.5 });
 
