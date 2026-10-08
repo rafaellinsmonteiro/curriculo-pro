@@ -115,6 +115,17 @@ export async function generatePDF(
       // ==========================================
       
       const RIGHT_LIMIT = PAGE_HEIGHT - PAGE_MARGIN - 30;
+      const LEFT_LIMIT = PAGE_HEIGHT - PAGE_MARGIN - 20;
+
+      // Found in production (08/10): a teacher's 22 courses lost the last 4 even
+      // at the smallest sidebar text. When the whole sidebar can't fit, the
+      // courses move to the main column, which flows onto the next page.
+      const sidebarFit = fittingSidebarFontDelta(data, leftY, LEFT_LIMIT, (doc as any).layoutMode);
+      const coursesInMain = !sidebarFit.fits && (data.cursos_complementares?.length || 0) > 0;
+      const sidebarData: StructuredResumeData = coursesInMain ? { ...data, cursos_complementares: [] } : data;
+      const sidebarFontDelta = coursesInMain
+        ? fittingSidebarFontDelta(sidebarData, leftY, LEFT_LIMIT, (doc as any).layoutMode).delta
+        : sidebarFit.delta;
 
       if (data.objetivo_profissional && rightY < RIGHT_LIMIT) {
         rightY = drawMainSection(doc, 'OBJETIVO PROFISSIONAL', rightY);
@@ -126,6 +137,21 @@ export async function generatePDF(
         for (const exp of data.experiencia_profissional) {
           if (rightY > RIGHT_LIMIT) break;
           rightY = drawExperience(doc, exp, rightY);
+        }
+      }
+
+      if (coursesInMain) {
+        rightY = drawMainSection(doc, 'CURSOS', rightY);
+        // No RIGHT_LIMIT cut here: drawListItem breaks to a new page itself.
+        for (const curso of data.cursos_complementares || []) {
+          const text = courseText(curso);
+          if (text) rightY = drawListItem(doc, text, rightY, COLORS.mainText, RIGHT_COL_X, RIGHT_COL_WIDTH);
+        }
+        // The sections below are skipped past RIGHT_LIMIT; give them a new page.
+        const more = Boolean(data.cnh || data.informacoes_adicionais?.length || data.competencias?.length || data.resumo_qualificacoes);
+        if (more && rightY >= RIGHT_LIMIT) {
+          doc.addPage();
+          rightY = doc.y;
         }
       }
 
@@ -166,9 +192,8 @@ export async function generatePDF(
       // Disable automatic page breaking for the sidebar so it truncates instead of spilling to page 2
       doc.page.margins.bottom = -10000;
 
-      const LEFT_LIMIT = PAGE_HEIGHT - PAGE_MARGIN - 20;
-      (doc as any).sidebarFontDelta = fittingSidebarFontDelta(data, leftY, LEFT_LIMIT, (doc as any).layoutMode);
-      drawSidebarColumn(doc, data, leftY, LEFT_LIMIT);
+      (doc as any).sidebarFontDelta = sidebarFontDelta;
+      drawSidebarColumn(doc, sidebarData, leftY, LEFT_LIMIT);
 
       doc.flushPages();
       doc.end();
@@ -457,7 +482,7 @@ function drawSidebarColumn(doc: PDFKit.PDFDocument, data: StructuredResumeData, 
  * measured on a scratch document with the same drawing code, and its text
  * shrinks in 0.5pt steps (down to 1.5pt) until it fits.
  */
-function fittingSidebarFontDelta(data: StructuredResumeData, y: number, limit: number, layoutMode: string): number {
+function fittingSidebarFontDelta(data: StructuredResumeData, y: number, limit: number, layoutMode: string): { delta: number; fits: boolean } {
   for (const delta of [0, -0.5, -1, -1.5]) {
     const scratch = new PDFDocument({ size: 'A4', margins: { top: PAGE_MARGIN, bottom: PAGE_MARGIN, left: PAGE_MARGIN, right: PAGE_MARGIN }, autoFirstPage: false });
     scratch.addPage();
@@ -466,9 +491,9 @@ function fittingSidebarFontDelta(data: StructuredResumeData, y: number, limit: n
     (scratch as any).sidebarFontDelta = delta;
     const end = drawSidebarColumn(scratch, data, y, Infinity);
     scratch.end();
-    if (end <= limit) return delta;
+    if (end <= limit) return { delta, fits: true };
   }
-  return -1.5;
+  return { delta: -1.5, fits: false };
 }
 
 function drawSidebarSection(doc: PDFKit.PDFDocument, title: string, y: number): number {
@@ -529,9 +554,13 @@ function drawCourse(
   curso: NonNullable<StructuredResumeData['cursos_complementares']>[0],
   y: number
 ): number {
-  const parts = [curso.nome, curso.instituicao, curso.periodo].filter(p => !isInvalidPart(p));
-  if (parts.length === 0) return y;
-  return drawListItem(doc, parts.join(' - '), y, COLORS.sidebarText, LEFT_COL_X + 10, LEFT_COL_WIDTH - 20, true);
+  const text = courseText(curso);
+  if (!text) return y;
+  return drawListItem(doc, text, y, COLORS.sidebarText, LEFT_COL_X + 10, LEFT_COL_WIDTH - 20, true);
+}
+
+function courseText(curso: NonNullable<StructuredResumeData['cursos_complementares']>[0]): string {
+  return [curso.nome, curso.instituicao, curso.periodo].filter(p => !isInvalidPart(p)).join(' - ');
 }
 
 function drawListItem(
