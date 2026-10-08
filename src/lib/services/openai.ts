@@ -39,7 +39,7 @@ const BASE_PROMPT = `Você é um Recrutador Especialista e Consultor de Carreira
 Seu objetivo é transformar as informações brutas (muitas vezes informais, com erros ou incompletas) fornecidas pelo usuário em um currículo impecável, altamente atraente para recrutadores e otimizado para processos seletivos.
 
 ### DIRETRIZES DE ESCRITA (MUITO IMPORTANTE):
-1. **Melhore e Enriqueça o Texto**: Reescreva as descrições para que soem profissionais, cultas e diretas. Corrija rigorosamente todos os erros gramaticais, ortográficos e de concordância em TODO o currículo (incluindo endereço, que deve ser padronizado no formato: Logradouro, Número, Bairro, Cidade - UF).
+1. **Melhore e Enriqueça o Texto**: Reescreva as descrições para que soem profissionais, cultas e diretas. Corrija rigorosamente todos os erros gramaticais, ortográficos e de concordância em TODO o currículo (incluindo endereço, que deve ser padronizado no formato: Logradouro, Número, Bairro, Cidade - UF, usando SOMENTE as partes que o usuário informou). NUNCA invente endereço, rua, número, bairro, CEP, telefone ou e-mail: se o usuário informou só a cidade, o \`endereco\` é só a cidade e o estado (ex.: "Campinas - SP"); se não informou nada, omita o campo. Valores fictícios como "Rua Exemplo, 123" são proibidos.
 2. **Resumo Profissional Robusto**: Crie um parágrafo envolvente (3 a 5 linhas) no campo \`resumo_profissional\`, destacando o perfil do candidato, suas qualidades e áreas de domínio (mesmo que o usuário tenha escrito pouco, deduza um perfil rico a partir dos cargos).
 3. **Experiência Profissional (Lógica Dupla CRÍTICA)**:
    - **CASO A (Detalhado)**: Se o usuário forneceu nomes de empresas e/ou datas (ex: "Trabalhei na HRL Confecções como auxiliar por 1 ano"), preencha \`empresa\`, \`cargo\` e \`periodo\` fielmente. **NÃO INVENTE descrições longas** se ele não descreveu o que fazia. Você pode deixar a \`descricao\` VAZIA, ou fazer uma frase extremamente curta, mantendo o currículo limpo e focado nas empresas.
@@ -73,6 +73,33 @@ Retorne os dados completos do currículo já atualizados no seguinte formato JSO
 ${JSON_SCHEMA}
 
 Retorne SOMENTE o JSON válido, sem texto adicional, sem formatação markdown (sem \`\`\`json).`;
+
+/**
+ * Found in production (08/10): a nurse who gave only her city got "Rua Exemplo, 123, Centro" in
+ * the header. A street that isn't in what the client sent (or an obvious placeholder) is dropped,
+ * keeping only the parts of the address that are; the city alone when that's all there is.
+ */
+function sanitizeAddress(data: StructuredResumeData, sourceText: string): StructuredResumeData {
+  if (!data.endereco) return data;
+  const norm = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const source = norm(sourceText);
+  const STREET = /^(rua|r\.|av\.?|avenida|travessa|tv\.?|alameda|estrada|rodovia|praca|largo|viela|beco|servidao)\b/;
+  const STOP = new Set(['rua', 'avenida', 'travessa', 'alameda', 'estrada', 'rodovia', 'praca', 'largo', 'viela', 'beco', 'servidao', 'de', 'da', 'do', 'das', 'dos', 'centro', 'bairro', 'numero']);
+  // An address marked as fake keeps only its city/state, whatever the source says (an edit's
+  // source holds the current data, invented address included).
+  const fake = /exemplo|ficticio|xxx/.test(norm(data.endereco));
+  const kept = data.endereco.split(',').map(part => part.trim()).filter(Boolean).filter(part => {
+    const plain = norm(part);
+    const words = plain.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(word => (word.length >= 3 || /^\d+$/.test(word)) && !STOP.has(word));
+    const streetOrNumber = STREET.test(plain) || /^(n[oº°.]?\s*)?\d+\b/.test(plain);
+    if (fake && streetOrNumber) return false;
+    // A street or number must come from the client's own text, every significant word of it.
+    if (streetOrNumber) return words.length > 0 && words.every(word => source.includes(word));
+    return words.length > 0 && words.some(word => source.includes(word));
+  });
+  const endereco = kept.join(', ');
+  return { ...data, endereco: endereco || undefined };
+}
 
 /**
  * Generate a new resume from raw text input
@@ -117,7 +144,7 @@ export async function generateResume(
     if (jsonStart !== -1 && jsonEnd !== -1) {
       cleaned = content.substring(jsonStart, jsonEnd + 1);
     }
-    const structured_data = JSON.parse(cleaned) as StructuredResumeData;
+    const structured_data = sanitizeAddress(JSON.parse(cleaned) as StructuredResumeData, prompt);
     return { structured_data, raw_response: content };
   } catch (err) {
     console.error("ERRO DE PARSE NA GERAÇÃO. Raw content:", content, err);
@@ -174,7 +201,8 @@ export async function editResume(
     if (jsonStart !== -1 && jsonEnd !== -1) {
       cleaned = content.substring(jsonStart, jsonEnd + 1);
     }
-    const structured_data = JSON.parse(cleaned) as StructuredResumeData;
+    // The source for an edit: the current data (minus an address it may already have invented) and the request.
+    const structured_data = sanitizeAddress(JSON.parse(cleaned) as StructuredResumeData, promptText);
     return { structured_data, raw_response: content };
   } catch (err) {
     console.error("ERRO DE PARSE NA EDIÇÃO. Raw content:", content, err);
